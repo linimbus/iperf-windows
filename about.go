@@ -1,45 +1,57 @@
 package main
 
 import (
-	"log"
+	"os/exec"
 
+	"github.com/astaxie/beego/logs"
 	"github.com/lxn/walk"
 	. "github.com/lxn/walk/declarative"
 )
 
-func AboutAction(mw *walk.MainWindow) {
+func OpenBrowserWeb(url string) {
+	cmd := exec.Command("rundll32", "url.dll,FileProtocolHandler", url)
+	err := cmd.Run()
+	if err != nil {
+		logs.Error("run cmd fail, %s", err.Error())
+	}
+}
+
+func AboutAction() {
 	var ok *walk.PushButton
 	var about *walk.Dialog
 	var err error
 
 	_, err = Dialog{
 		AssignTo:      &about,
-		Title:         "About",
+		Title:         "Sponsor",
 		Icon:          walk.IconInformation(),
-		MinSize:       Size{Width: 300, Height: 200},
+		MinSize:       Size{Width: 200, Height: 200},
 		DefaultButton: &ok,
 		Layout:        VBox{},
 		Children: []Widget{
-			TextLabel{
-				Text:    "helloworld",
-				MinSize: Size{Width: 250, Height: 200},
-				MaxSize: Size{Width: 290, Height: 400},
+			Composite{
+				Layout: HBox{},
+				Children: []Widget{
+					TextLabel{
+						MinSize: Size{Width: 180, Height: 180},
+						Text:    "Thank you for using my software. If you are pleased with it, you can donate through the link below. Thank you very much for your support.",
+					},
+				},
 			},
-			Label{
-				Text:          "Version: " + VersionGet(),
-				TextAlignment: AlignCenter,
-			},
-			VSpacer{
-				MinSize: Size{Height: 10},
+			PushButton{
+				Text: "paypal.me",
+				OnClicked: func() {
+					OpenBrowserWeb("https://paypal.me/lixiangyun")
+				},
 			},
 			PushButton{
 				Text:      "OK",
 				OnClicked: func() { about.Cancel() },
 			},
 		},
-	}.Run(mw)
+	}.Run(mainWindow)
 
 	if err != nil {
-		log.Println(err.Error())
+		logs.Error(err.Error())
 	}
 }

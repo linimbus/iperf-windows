@@ -1,3 +1,3 @@
-rsrc -manifest exe.manifest -ico main.ico
-
-go build -ldflags="-H windowsgui -w -s" -o iperf-windows.exe
+rsrc -manifest exe.manifest -ico static/main.ico
+rice embed-go
+go build -ldflags="-H windowsgui -w -s" -o iperf3-windows.exe
