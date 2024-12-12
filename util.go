@@ -1,16 +1,11 @@
 package main
 
 import (
-	"crypto/tls"
 	"fmt"
-	"io"
-	"math/rand"
 	"net"
-	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
-	"time"
 
 	"github.com/astaxie/beego/logs"
 	"github.com/lxn/walk"
@@ -71,8 +66,8 @@ func InterfaceGet(iface *net.Interface) ([]net.IP, error) {
 	return ips, nil
 }
 
-func AddressOptions() []string {
-	output := []string{}
+func InterfaceOptions() []string {
+	output := []string{"0.0.0.0", "::"}
 	ifaces, err := net.Interfaces()
 	if err != nil {
 		logs.Error(err.Error())
@@ -93,29 +88,6 @@ func AddressOptions() []string {
 	return output
 }
 
-func InterfaceOptions() []string {
-	output := []string{""}
-	ifaces, err := net.Interfaces()
-	if err != nil {
-		logs.Error(err.Error())
-		return output
-	}
-	for _, v := range ifaces {
-		output = append(output, v.Name)
-	}
-	return output
-}
-
-func GenerateUsername(length int) string {
-	charSet := "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*_+-="
-	username := make([]byte, length)
-	for i := range username {
-		index := rand.Intn(len(charSet))
-		username[i] = charSet[index]
-	}
-	return string(username)
-}
-
 func CopyClipboard() (string, error) {
 	text, err := walk.Clipboard().Text()
 	if err != nil {
@@ -131,44 +103,4 @@ func PasteClipboard(input string) error {
 		logs.Error(err.Error())
 	}
 	return err
-}
-
-func CreateTlsConfig(cert, key string) (*tls.Config, error) {
-	certs, err := tls.X509KeyPair([]byte(cert), []byte(key))
-	if err != nil {
-		return nil, err
-	}
-	return &tls.Config{
-		MinVersion:   tls.VersionTLS12,
-		MaxVersion:   tls.VersionTLS13,
-		Certificates: []tls.Certificate{certs},
-		ClientAuth:   tls.RequestClientCert,
-	}, nil
-}
-
-func HttpRequest(url string) ([]byte, error) {
-	client := &http.Client{Timeout: 5 * time.Second}
-
-	req, err := http.NewRequest("GET", url, nil)
-	if err != nil {
-		return nil, err
-	}
-	req.Header.Set("Accept", "*/*")
-	req.Header.Set("User-Agent", "curl/8.10.1")
-
-	resp, err := client.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("http request fail, status: %d", resp.StatusCode)
-	}
-
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, err
-	}
-	return body, nil
 }

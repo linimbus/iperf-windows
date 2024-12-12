@@ -8,14 +8,21 @@ import (
 	"github.com/astaxie/beego/logs"
 )
 
-func ServerStartup() error {
-	s := iperf.NewServer()
-	err := s.Start()
+func ServerStartup(port int) (*iperf.Server, error) {
+	options := &iperf.ServerOptions{Interval: new(int), JSON: new(bool), Port: new(int)}
+	*options.Interval = 1
+	*options.JSON = true
+	*options.Port = port
+
+	srv := iperf.NewServer()
+	srv.LoadOptions(options)
+
+	err := srv.Start()
 	if err != nil {
 		logs.Warning("iperf startup failed, %s", err.Error())
-		return err
+		return nil, err
 	}
-	return nil
+	return srv, nil
 }
 
 func ClientStartup() {

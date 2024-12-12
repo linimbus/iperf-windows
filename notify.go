@@ -9,27 +9,26 @@ import (
 
 var notify *walk.NotifyIcon
 
-func NotifyAction() {
-	if notify == nil {
-		NotifyInit()
-	}
-	mainWindow.SetVisible(false)
-}
-
 func NotifyExit() {
-	if notify == nil {
-		return
+	if notify != nil {
+		err := notify.Dispose()
+		if err != nil {
+			logs.Warning("notify dispose failed, %s", err.Error())
+		}
+		notify = nil
 	}
-	notify.Dispose()
-	notify = nil
 }
 
 var lastCheck time.Time
 
 func NotifyInit() {
+	if notify != nil {
+		return
+	}
+
 	var err error
 
-	notify, err = walk.NewNotifyIcon(mainWindow)
+	notify, err = walk.NewNotifyIcon(clientWindow)
 	if err != nil {
 		logs.Error("new notify icon fail, %s", err.Error())
 		return
@@ -41,7 +40,7 @@ func NotifyInit() {
 		return
 	}
 
-	err = notify.SetToolTip(statusConnectivity)
+	err = notify.SetToolTip("")
 	if err != nil {
 		logs.Error("set notify tool tip fail, %s", err.Error())
 		return
@@ -55,37 +54,37 @@ func NotifyInit() {
 	}
 
 	exitBut.Triggered().Attach(func() {
-		walk.App().Exit(0)
+		CloseWindows()
 	})
 
-	connectivityBut := walk.NewAction()
-	err = connectivityBut.SetText("Paste Clipboard")
+	serverBut := walk.NewAction()
+	err = serverBut.SetText("Show Server Windows")
 	if err != nil {
 		logs.Error("notify new action fail, %s", err.Error())
 		return
 	}
 
-	connectivityBut.Triggered().Attach(func() {
-		PasteClipboard(statusConnectivity)
+	serverBut.Triggered().Attach(func() {
+		serverWindow.SetVisible(true)
 	})
 
-	showBut := walk.NewAction()
-	err = showBut.SetText("Show Windows")
+	clientBut := walk.NewAction()
+	err = clientBut.SetText("Show Client Windows")
 	if err != nil {
 		logs.Error("notify new action fail, %s", err.Error())
 		return
 	}
 
-	showBut.Triggered().Attach(func() {
-		mainWindow.SetVisible(true)
+	clientBut.Triggered().Attach(func() {
+		clientWindow.SetVisible(true)
 	})
 
-	if err := notify.ContextMenu().Actions().Add(connectivityBut); err != nil {
+	if err := notify.ContextMenu().Actions().Add(clientBut); err != nil {
 		logs.Error("notify add action fail, %s", err.Error())
 		return
 	}
 
-	if err := notify.ContextMenu().Actions().Add(showBut); err != nil {
+	if err := notify.ContextMenu().Actions().Add(serverBut); err != nil {
 		logs.Error("notify add action fail, %s", err.Error())
 		return
 	}
@@ -101,7 +100,8 @@ func NotifyInit() {
 		}
 		now := time.Now()
 		if now.Sub(lastCheck) < time.Second {
-			mainWindow.SetVisible(true)
+			clientWindow.SetVisible(true)
+			serverWindow.SetVisible(true)
 		}
 		lastCheck = now
 	})

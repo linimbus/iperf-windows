@@ -10,23 +10,15 @@ import (
 )
 
 type Config struct {
-	ConnectivityURL string
-	FilterInterface string
-	OutputDirectory string
-	RestfulHeader   string
-	RestfulMethod   string
-	RestfulURL      string
-	Interval        int
+	ServerPort     int
+	ServerInterval int
+	ServerLog      string
 }
 
 var configCache = Config{
-	ConnectivityURL: "https://test.ipw.cn/",
-	FilterInterface: "",
-	OutputDirectory: "",
-	RestfulHeader:   "",
-	RestfulMethod:   "POST",
-	RestfulURL:      "",
-	Interval:        60,
+	ServerPort:     5012,
+	ServerInterval: 1,
+	ServerLog:      "",
 }
 
 var configFilePath string
@@ -46,41 +38,6 @@ func configSyncToFile() error {
 
 func ConfigGet() *Config {
 	return &configCache
-}
-
-func ConnectivityURLSave(url string) error {
-	configCache.ConnectivityURL = url
-	return configSyncToFile()
-}
-
-func FilterInterfaceSave(filter string) error {
-	configCache.FilterInterface = filter
-	return configSyncToFile()
-}
-
-func OutputDirectorySave(dir string) error {
-	configCache.OutputDirectory = dir
-	return configSyncToFile()
-}
-
-func RestfulHeaderSave(key, value string) error {
-	configCache.RestfulHeader = fmt.Sprintf("%s:%s", key, value)
-	return configSyncToFile()
-}
-
-func RestfulMethodSave(method string) error {
-	configCache.RestfulMethod = method
-	return configSyncToFile()
-}
-
-func RestfulURLSave(url string) error {
-	configCache.RestfulURL = url
-	return configSyncToFile()
-}
-
-func IntervalSave(value int) error {
-	configCache.Interval = value
-	return configSyncToFile()
 }
 
 func ConfigInit() error {

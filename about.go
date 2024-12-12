@@ -16,7 +16,7 @@ func OpenBrowserWeb(url string) {
 	}
 }
 
-func AboutAction() {
+func AboutAction(owner walk.Form) {
 	var ok *walk.PushButton
 	var about *walk.Dialog
 	var err error
@@ -49,7 +49,7 @@ func AboutAction() {
 				OnClicked: func() { about.Cancel() },
 			},
 		},
-	}.Run(mainWindow)
+	}.Run(owner)
 
 	if err != nil {
 		logs.Error(err.Error())
