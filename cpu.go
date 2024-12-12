@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/astaxie/beego/logs"
@@ -11,7 +12,7 @@ import (
 func init() {
 	go func() {
 		for {
-			time.Sleep(time.Second)
+			time.Sleep(time.Second * 2)
 
 			cpuPercent, err := cpu.Percent(0, false)
 			if err != nil {
@@ -25,8 +26,12 @@ func init() {
 				continue
 			}
 
-			logs.Info("CPU 使用率: %.2f%%\n", cpuPercent[0])
-			logs.Info("内存使用率: %.2f%%\n", memInfo.UsedPercent)
+			info := fmt.Sprintf("CPU: %.2f%% MEM: %.2f%%", cpuPercent[0], memInfo.UsedPercent)
+
+			ServerStatusUpdate(info)
+			ClientStatusUpdate(info)
+
+			logs.Info("system resource info %s", info)
 		}
 	}()
 

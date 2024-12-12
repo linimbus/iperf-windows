@@ -40,6 +40,21 @@ func ConfigGet() *Config {
 	return &configCache
 }
 
+func ServerDirSave(path string) error {
+	configCache.ServerLog = path
+	return configSyncToFile()
+}
+
+func ServerIntervalSave(value int) error {
+	configCache.ServerInterval = value
+	return configSyncToFile()
+}
+
+func ServerPortSave(port int) error {
+	configCache.ServerPort = port
+	return configSyncToFile()
+}
+
 func ConfigInit() error {
 	configFilePath = fmt.Sprintf("%s%c%s", ConfigDirGet(), os.PathSeparator, "config.json")
 

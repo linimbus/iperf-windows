@@ -8,11 +8,12 @@ import (
 	"github.com/astaxie/beego/logs"
 )
 
-func ServerStartup(port int) (*iperf.Server, error) {
-	options := &iperf.ServerOptions{Interval: new(int), JSON: new(bool), Port: new(int)}
-	*options.Interval = 1
+func ServerStartup() (*iperf.Server, error) {
+	options := &iperf.ServerOptions{Interval: new(int), JSON: new(bool), Port: new(int), LogFile: new(string)}
+	*options.Interval = ConfigGet().ServerInterval
 	*options.JSON = true
-	*options.Port = port
+	*options.Port = ConfigGet().ServerPort
+	*options.LogFile = ConfigGet().ServerLog
 
 	srv := iperf.NewServer()
 	srv.LoadOptions(options)

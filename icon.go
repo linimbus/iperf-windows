@@ -40,11 +40,14 @@ var ICON_Main *walk.Icon
 var ICON_Status *walk.Icon
 var ICON_Start *walk.Icon
 var ICON_Stop *walk.Icon
-var ICON_Downlink *walk.Icon
-var ICON_Uplink *walk.Icon
+var ICON_Flow *walk.Icon
 
 var ICON_Max_Size = walk.Size{
 	Width: 64, Height: 64,
+}
+
+var ICON_Mid_Size = walk.Size{
+	Width: 48, Height: 48,
 }
 
 var ICON_Min_Size = walk.Size{
@@ -53,10 +56,11 @@ var ICON_Min_Size = walk.Size{
 
 func IconInit() error {
 	ICON_Main = IconLoadFromBox("main.ico", ICON_Max_Size)
+
+	ICON_Start = IconLoadFromBox("start.ico", ICON_Mid_Size)
+	ICON_Stop = IconLoadFromBox("stop.ico", ICON_Mid_Size)
+
 	ICON_Status = IconLoadFromBox("status.ico", ICON_Min_Size)
-	ICON_Start = IconLoadFromBox("start.ico", ICON_Min_Size)
-	ICON_Stop = IconLoadFromBox("stop.ico", ICON_Min_Size)
-	ICON_Downlink = IconLoadFromBox("downlink.ico", ICON_Min_Size)
-	ICON_Uplink = IconLoadFromBox("uplink.ico", ICON_Min_Size)
+	ICON_Flow = IconLoadFromBox("flow.ico", ICON_Min_Size)
 	return nil
 }

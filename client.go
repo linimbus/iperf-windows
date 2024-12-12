@@ -7,6 +7,13 @@ import (
 )
 
 var clientWindow *walk.MainWindow
+var clientStatusBar, clientFlowBar *walk.StatusBarItem
+
+func ClientStatusUpdate(value string) {
+	if clientStatusBar != nil {
+		clientStatusBar.SetText(value)
+	}
+}
 
 func ClientClose() {
 	if clientWindow != nil {
@@ -19,14 +26,13 @@ func ClientClose() {
 }
 
 func ClientWindows() error {
-	var statusBar *walk.StatusBarItem
 
 	cnt, err := MainWindow{
 		Title:    "IPerf3 Client " + VersionGet(),
 		Icon:     ICON_Main,
 		AssignTo: &clientWindow,
-		MinSize:  Size{Width: 200, Height: 300},
-		Size:     Size{Width: 200, Height: 300},
+		MinSize:  Size{Width: 400, Height: 250},
+		Size:     Size{Width: 400, Height: 250},
 		Layout:   VBox{Margins: Margins{Top: 5, Bottom: 5, Left: 5, Right: 5}},
 		Font:     Font{Bold: true},
 		MenuItems: []MenuItem{
@@ -52,12 +58,14 @@ func ClientWindows() error {
 		},
 		StatusBarItems: []StatusBarItem{
 			{
-				AssignTo: &statusBar,
-				Text:     "",
+				AssignTo: &clientStatusBar,
 				Icon:     ICON_Status,
-				Width:    300,
-				OnClicked: func() {
-				},
+				Width:    160,
+			},
+			{
+				AssignTo: &clientFlowBar,
+				Icon:     ICON_Flow,
+				Width:    160,
 			},
 		},
 		Children: []Widget{
