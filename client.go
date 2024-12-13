@@ -73,7 +73,6 @@ func MakeNumberEdit(max, min int, tips string, cfg *int, form walk.Form) Composi
 }
 
 func ClientEnable(flag bool) {
-	clientActive.SetEnabled(flag)
 	clientAddress.SetEnabled(flag)
 	clientProtocol.SetEnabled(flag)
 	clientBandwidthUnit.SetEnabled(flag)
@@ -85,6 +84,18 @@ func ClientEnable(flag bool) {
 	for _, but := range clientCheckBoxList {
 		but.SetEnabled(flag)
 	}
+
+	if flag {
+		clientActive.SetImage(ICON_Start)
+		clientActive.SetToolTipText("Start IPerf3 Client")
+		clientActive.SetText("Start")
+	} else {
+		clientActive.SetImage(ICON_Stop)
+		clientActive.SetToolTipText("Stop IPerf3 Client")
+		clientActive.SetText("Stop")
+	}
+
+	clientActive.SetEnabled(flag)
 }
 
 func ClientActive() {
@@ -96,18 +107,20 @@ func ClientActive() {
 		return
 	}
 
-	for i := 0; i < configCache.ClientRunTime+1; i++ {
-		time.Sleep(time.Second)
-		clientProcessBar.SetValue((i * 100) / (configCache.ClientRunTime + 1))
-	}
-
-	for {
-		clientProcessBar.SetValue(100)
+	for i := 0; ; i++ {
 		if !c.running {
 			break
 		}
-		time.Sleep(time.Millisecond * 100)
+		time.Sleep(time.Second)
+
+		if i > configCache.ClientRunTime {
+			clientProcessBar.SetValue(100)
+		} else {
+			clientProcessBar.SetValue((i * 100) / (configCache.ClientRunTime))
+		}
 	}
+
+	time.Sleep(time.Millisecond * 100)
 	clientProcessBar.SetValue(0)
 }
 
