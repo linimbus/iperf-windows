@@ -10,15 +10,51 @@ import (
 )
 
 type Config struct {
-	ServerPort     int
-	ServerInterval int
-	ServerLog      string
+	ServerPort        int
+	ServerInterval    int
+	ServerLog         string
+	ServerAutoStartup bool
+	ServerAutoHide    bool
+	ServerJsonFormat  bool
+
+	ClientAddress       string
+	ClientPort          int
+	ClientRunTime       int
+	ClientOmitSec       int
+	ClientProtocol      string
+	ClientPayload       int
+	ClientJsonFormat    bool
+	ClientDontFragment  bool
+	ClientZeroCopy      bool
+	ClientNoDelay       bool
+	ClientStreams       int
+	ClientBandwidth     int
+	ClientBandwidthUnit string // KB,MB,GB
+	ClientDscp          int
 }
 
 var configCache = Config{
-	ServerPort:     5012,
-	ServerInterval: 1,
-	ServerLog:      "",
+	ServerPort:        5012,
+	ServerInterval:    1,
+	ServerLog:         "",
+	ServerAutoStartup: false,
+	ServerAutoHide:    false,
+	ServerJsonFormat:  true,
+
+	ClientAddress:       "127.0.0.1",
+	ClientPort:          5012,
+	ClientRunTime:       10,
+	ClientOmitSec:       0,
+	ClientProtocol:      "tcp",
+	ClientPayload:       1024,
+	ClientJsonFormat:    true,
+	ClientDontFragment:  false,
+	ClientZeroCopy:      false,
+	ClientNoDelay:       false,
+	ClientStreams:       1,
+	ClientBandwidth:     0,
+	ClientBandwidthUnit: "MB",
+	ClientDscp:          0,
 }
 
 var configFilePath string
@@ -34,25 +70,6 @@ func configSyncToFile() error {
 		return err
 	}
 	return os.WriteFile(configFilePath, value, 0664)
-}
-
-func ConfigGet() *Config {
-	return &configCache
-}
-
-func ServerDirSave(path string) error {
-	configCache.ServerLog = path
-	return configSyncToFile()
-}
-
-func ServerIntervalSave(value int) error {
-	configCache.ServerInterval = value
-	return configSyncToFile()
-}
-
-func ServerPortSave(port int) error {
-	configCache.ServerPort = port
-	return configSyncToFile()
 }
 
 func ConfigInit() error {

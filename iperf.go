@@ -1,80 +1,198 @@
 package main
 
 import (
+	"bufio"
+	"context"
+	"encoding/json"
 	"fmt"
-	"os"
+	"io"
+	"os/exec"
+	"path/filepath"
+	"strings"
+	"syscall"
+	"time"
 
-	iperf "github.com/BGrewell/go-iperf"
 	"github.com/astaxie/beego/logs"
 )
 
-func ServerStartup() (*iperf.Server, error) {
-	options := &iperf.ServerOptions{Interval: new(int), JSON: new(bool), Port: new(int), LogFile: new(string)}
-	*options.Interval = ConfigGet().ServerInterval
-	*options.JSON = true
-	*options.Port = ConfigGet().ServerPort
-	*options.LogFile = ConfigGet().ServerLog
+type IperfServer struct {
+	running  bool
+	exitCode int
+	stdOut   io.ReadCloser
+	stdErr   io.ReadCloser
+	cancel   context.CancelFunc
+}
 
-	srv := iperf.NewServer()
-	srv.LoadOptions(options)
+func ExecuteAsync(binary string, cmd []string) (stdOut io.ReadCloser, stdErr io.ReadCloser, cancel context.CancelFunc, exitCode chan int, err error) {
+	exitCode = make(chan int)
 
-	err := srv.Start()
+	ctx, cancel := context.WithCancel(context.Background())
+	exe := exec.CommandContext(ctx, binary, cmd...)
+	exe.SysProcAttr = &syscall.SysProcAttr{
+		HideWindow: true,
+	}
+
+	stdOut, err = exe.StdoutPipe()
 	if err != nil {
-		logs.Warning("iperf startup failed, %s", err.Error())
+		defer cancel()
+		return nil, nil, nil, nil, err
+	}
+	stdErr, err = exe.StderrPipe()
+	if err != nil {
+		defer cancel()
+		return nil, nil, nil, nil, err
+	}
+	err = exe.Start()
+	if err != nil {
+		defer cancel()
+		return nil, nil, nil, nil, err
+	}
+	go func() {
+		if err := exe.Wait(); err != nil {
+			if exiterr, ok := err.(*exec.ExitError); ok {
+				if status, ok := exiterr.Sys().(syscall.WaitStatus); ok {
+					exitCode <- status.ExitStatus()
+				}
+			}
+		} else {
+			exitCode <- 0
+		}
+	}()
+	return stdOut, stdErr, cancel, exitCode, nil
+}
+
+func (s *IperfServer) Shutdown() {
+	if s.running && s.cancel != nil {
+		s.cancel()
+		time.Sleep(100 * time.Millisecond)
+	}
+}
+
+func ReaderScan(prefix string, buff io.ReadCloser) {
+	if buff == nil {
+		logs.Info("unable to read, ReadCloser is nil")
+		return
+	}
+
+	scanner := bufio.NewScanner(buff)
+	scanner.Split(bufio.ScanWords)
+	for scanner.Scan() {
+		text := scanner.Text()
+		logs.Info("%s -> %s", prefix, text)
+	}
+}
+
+func ServerStartup() (*IperfServer, error) {
+	value, err := json.Marshal(configCache)
+	if err != nil {
+		logs.Error("json marshal config fail, %s", err.Error())
+	} else {
+		logs.Info("iperf server options %s", string(value))
+	}
+
+	builder := strings.Builder{}
+	builder.WriteString(" -s")
+	fmt.Fprintf(&builder, " --port %d", configCache.ServerPort)
+
+	if configCache.ServerInterval > 0 {
+		fmt.Fprintf(&builder, " --interval %d", configCache.ServerInterval)
+	}
+
+	if configCache.ServerJsonFormat {
+		fmt.Fprintf(&builder, " --json %d", configCache.ServerInterval)
+	}
+
+	stdout, stdErr, cancel, exitCode, err := ExecuteAsync(filepath.Join(ToolDirGet(), "iperf3.exe"), strings.Fields(builder.String()))
+	if err != nil {
+		logs.Warning("iperf server startup failed, %s", err.Error())
 		return nil, err
 	}
+
+	srv := new(IperfServer)
+	srv.stdOut = stdout
+	srv.stdErr = stdErr
+	srv.cancel = cancel
+	srv.running = true
+
+	go ReaderScan("IPerf3 server stdout: ", stdout)
+	go ReaderScan("IPerf3 server stderr: ", stdErr)
+
+	go func() {
+		exitCode := <-exitCode
+
+		srv.exitCode = exitCode
+		srv.running = false
+	}()
+
 	return srv, nil
 }
 
-func ClientStartup() {
+func ClientStartup() (*IperfServer, error) {
 
-	includeServer := true
-	proto := "tcp"
-	runTime := 10
-	omitSec := 0
-	length := "65500"
-
-	c := iperf.NewClient("10.254.100.100")
-	c.SetIncludeServer(includeServer)
-	c.SetTimeSec(runTime)
-	c.SetOmitSec(omitSec)
-	c.SetProto((iperf.Protocol)(proto))
-	c.SetLength(length)
-	c.SetJSON(false)
-	c.SetIncludeServer(false)
-	c.SetStreams(2)
-	reports := c.SetModeLive()
-
-	go func() {
-		for report := range reports {
-			fmt.Println(report.String())
-		}
-	}()
-
-	err := c.Start()
+	value, err := json.Marshal(configCache)
 	if err != nil {
-		fmt.Println("failed to start client")
-		os.Exit(-1)
+		logs.Error("json marshal config fail, %s", err.Error())
+	} else {
+		logs.Info("iperf client options %s", string(value))
 	}
 
-	// Method 1: Wait for the test to finish by pulling from the 'Done' channel which will block until something is put in or it's closed
-	<-c.Done
+	builder := strings.Builder{}
+	fmt.Fprintf(&builder, "-c %s", configCache.ClientAddress)
+	fmt.Fprintf(&builder, " -p %d", configCache.ClientPort)
+	fmt.Fprintf(&builder, " -t %d", configCache.ClientRunTime)
+	fmt.Fprintf(&builder, " -P %d", configCache.ClientStreams)
 
-	// Method 2: Poll the c.Running state and wait for it to be 'false'
-	//for c.Running {
-	//	time.Sleep(100 * time.Millisecond)
-	//}
+	if configCache.ClientOmitSec > 0 {
+		fmt.Fprintf(&builder, " -O %d", configCache.ClientOmitSec)
+	}
 
-	//if c.Report().Error != "" {
-	//	fmt.Println(c.Report().Error)
-	//} else {
-	//	for _, entry := range c.Report().End.Streams {
-	//		fmt.Println(entry.String())
-	//	}
-	//	for _, entry := range c.Report().ServerOutputJson.End.Streams {
-	//		fmt.Println(entry.String())
-	//	}
-	//	fmt.Printf("DL Rate: %s\n", conversions.IntBitRateToString(int64(c.Report().End.SumReceived.BitsPerSecond)))
-	//	fmt.Printf("UL Rate: %s\n", conversions.IntBitRateToString(int64(c.Report().End.SumSent.BitsPerSecond)))
-	//}
+	if configCache.ClientBandwidth > 0 {
+		fmt.Fprintf(&builder, " -b %d%c", configCache.ClientBandwidth, configCache.ClientBandwidthUnit[0])
+	}
+
+	if configCache.ClientProtocol == "udp" {
+		builder.WriteString(" -u")
+	}
+
+	if configCache.ClientNoDelay {
+		builder.WriteString(" -N")
+	}
+
+	if configCache.ClientZeroCopy {
+		builder.WriteString(" -Z")
+	}
+
+	if configCache.ClientPayload > 0 {
+		fmt.Fprintf(&builder, " -l %d", configCache.ClientPayload)
+	}
+
+	if configCache.ClientJsonFormat {
+		builder.WriteString(" -J")
+	}
+
+	builder.WriteString(" --get-server-output")
+
+	stdout, stdErr, cancel, exitCode, err := ExecuteAsync(filepath.Join(ToolDirGet(), "iperf3.exe"), strings.Fields(builder.String()))
+	if err != nil {
+		logs.Warning("iperf server startup failed, %s", err.Error())
+		return nil, err
+	}
+
+	srv := new(IperfServer)
+	srv.stdOut = stdout
+	srv.stdErr = stdErr
+	srv.cancel = cancel
+	srv.running = true
+
+	go ReaderScan("IPerf3 client stdout: ", stdout)
+	go ReaderScan("IPerf3 client stderr: ", stdErr)
+
+	go func() {
+		exitCode := <-exitCode
+
+		srv.exitCode = exitCode
+		srv.running = false
+	}()
+
+	return srv, nil
 }

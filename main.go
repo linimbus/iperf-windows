@@ -5,17 +5,17 @@ import (
 )
 
 func main() {
-	err := FileInit()
+	err := BoxInit()
+	if err != nil {
+		logs.Error(err.Error())
+		return
+	}
+	err = FileInit()
 	if err != nil {
 		logs.Error(err.Error())
 		return
 	}
 	err = LogInit()
-	if err != nil {
-		logs.Error(err.Error())
-		return
-	}
-	err = BoxInit()
 	if err != nil {
 		logs.Error(err.Error())
 		return

@@ -28,7 +28,7 @@ func NotifyInit() {
 
 	var err error
 
-	notify, err = walk.NewNotifyIcon(clientWindow)
+	notify, err = walk.NewNotifyIcon(serverWindow)
 	if err != nil {
 		logs.Error("new notify icon fail, %s", err.Error())
 		return

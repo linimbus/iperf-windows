@@ -5,7 +5,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/BGrewell/go-iperf"
 	"github.com/astaxie/beego/logs"
 	"github.com/lxn/walk"
 	. "github.com/lxn/walk/declarative"
@@ -13,22 +12,62 @@ import (
 )
 
 var serverWindow *walk.MainWindow
-var serverInstance *iperf.Server
+var serverInstance *IperfServer
 var serverMutex sync.Mutex
 var serverActive, serverFolderBut *walk.PushButton
 var serverStatusBar, serverFlowBar *walk.StatusBarItem
 var serverPort, serverInterval *walk.NumberEdit
 var serverFolder *walk.LineEdit
 
+var serverCheckBoxList []*walk.CheckBox
+
+func MakeCheckBox(name string, cfg *bool, form walk.Form) CheckBox {
+	var box *walk.CheckBox
+	return CheckBox{
+		AssignTo: &box,
+		Text:     name,
+		Checked:  *cfg,
+		OnCheckedChanged: func() {
+			*cfg = box.Checked()
+			err := configSyncToFile()
+			if err != nil {
+				ErrorBoxAction(form, err.Error())
+			}
+		},
+		OnBoundsChanged: func() {
+			serverCheckBoxList = append(serverCheckBoxList, box)
+		},
+	}
+}
+
 func init() {
+	serverCheckBoxList = make([]*walk.CheckBox, 0)
 	go func() {
 		for {
 			if serverWindow != nil && serverWindow.Visible() {
 				break
 			}
-			time.Sleep(100 * time.Millisecond)
+			time.Sleep(time.Millisecond * 100)
 		}
-		// NotifyAction()
+		NotifyInit()
+
+		if configCache.ServerAutoHide {
+			serverWindow.SetVisible(false)
+		}
+
+		if configCache.ServerAutoStartup && !ServerRunning() {
+			ServerSwitch()
+		}
+
+		for {
+			time.Sleep(time.Millisecond * 100)
+
+			serverMutex.Lock()
+			if serverInstance != nil && !serverInstance.running {
+				ServerStatus(ServerRunning())
+			}
+			serverMutex.Unlock()
+		}
 	}()
 }
 
@@ -49,17 +88,32 @@ func ServerStart() error {
 		logs.Warning("iperf server startup failed, %s", err.Error())
 		return err
 	}
+
 	return nil
 }
 
 func ServerStatus(flag bool) {
 	serverPort.SetEnabled(!flag)
 	serverInterval.SetEnabled(!flag)
+	serverFolderBut.SetEnabled(!flag)
+	serverFolder.SetEnabled(!flag)
+	for _, box := range serverCheckBoxList {
+		box.SetEnabled(!flag)
+	}
+	if flag {
+		serverActive.SetImage(ICON_Stop)
+		serverActive.SetToolTipText("Stop IPerf3 Server")
+		serverActive.SetText("Stop")
+	} else {
+		serverActive.SetImage(ICON_Start)
+		serverActive.SetToolTipText("Startup IPerf3 Server")
+		serverActive.SetText("Startup")
+	}
 }
 
 func ServerShutdown() error {
 	if serverInstance != nil {
-		serverInstance.Stop()
+		serverInstance.Shutdown()
 		serverInstance = nil
 	}
 	return nil
@@ -68,6 +122,8 @@ func ServerShutdown() error {
 func ServerSwitch() {
 	serverMutex.Lock()
 	defer serverMutex.Unlock()
+
+	defer serverActive.SetEnabled(true)
 
 	var err error
 	if ServerRunning() {
@@ -80,16 +136,7 @@ func ServerSwitch() {
 		ErrorBoxAction(serverWindow, err.Error())
 	}
 
-	if ServerRunning() {
-		serverActive.SetImage(ICON_Stop)
-		serverActive.SetToolTipText("Stop IPerf3 Server")
-	} else {
-		serverActive.SetImage(ICON_Start)
-		serverActive.SetToolTipText("Startup IPerf3 Server")
-	}
 	ServerStatus(ServerRunning())
-
-	serverActive.SetEnabled(true)
 }
 
 func ServerClose() {
@@ -120,7 +167,7 @@ func ServerWindows() error {
 				},
 			},
 			Action{
-				Text: "Mini Windows",
+				Text: "Hide Window",
 				OnTriggered: func() {
 					NotifyInit()
 					serverWindow.SetVisible(false)
@@ -150,29 +197,6 @@ func ServerWindows() error {
 				Layout: Grid{Columns: 2},
 				Children: []Widget{
 					Label{
-						Text: "Listen Port: ",
-					},
-					Composite{
-						Layout: HBox{MarginsZero: true},
-						Children: []Widget{
-							NumberEdit{
-								AssignTo: &serverPort,
-								Value:    float64(ConfigGet().ServerPort),
-								MaxValue: 65535,
-								MinValue: 1,
-								OnValueChanged: func() {
-									err := ServerPortSave(int(serverPort.Value()))
-									if err != nil {
-										ErrorBoxAction(serverWindow, err.Error())
-									}
-								},
-							},
-							Label{
-								Text: " 1~65535",
-							},
-						},
-					},
-					Label{
 						Text: "Statistics Output: ",
 					},
 					Composite{
@@ -180,7 +204,7 @@ func ServerWindows() error {
 						Children: []Widget{
 							LineEdit{
 								AssignTo: &serverFolder,
-								Text:     ConfigGet().ServerLog,
+								Text:     configCache.ServerLog,
 								OnEditingFinished: func() {
 									dir := serverFolder.Text()
 									if dir != "" {
@@ -188,18 +212,18 @@ func ServerWindows() error {
 										if err != nil {
 											ErrorBoxAction(serverWindow, "The server folder is not exist")
 											serverFolder.SetText("")
-											ServerDirSave("")
-											return
-										}
-										if !stat.IsDir() {
+											dir = ""
+										} else if !stat.IsDir() {
 											ErrorBoxAction(serverWindow, "The server folder is not directory")
 											serverFolder.SetText("")
-											ServerDirSave("")
-											return
+											dir = ""
 										}
-										return
 									}
-									ServerDirSave(dir)
+									configCache.ServerLog = dir
+									err := configSyncToFile()
+									if err != nil {
+										ErrorBoxAction(serverWindow, err.Error())
+									}
 								},
 							},
 							PushButton{
@@ -208,7 +232,7 @@ func ServerWindows() error {
 								Text:     " ... ",
 								OnClicked: func() {
 									dlgDir := new(walk.FileDialog)
-									dlgDir.FilePath = ConfigGet().ServerLog
+									dlgDir.FilePath = configCache.ServerLog
 									dlgDir.Flags = win.OFN_EXPLORER
 									dlgDir.Title = "Please select a folder as output file directory"
 
@@ -219,8 +243,13 @@ func ServerWindows() error {
 									}
 									if exist {
 										logs.Info("select %s as output file directory", dlgDir.FilePath)
+
 										serverFolder.SetText(dlgDir.FilePath)
-										ServerDirSave(dlgDir.FilePath)
+										configCache.ServerLog = dlgDir.FilePath
+										err := configSyncToFile()
+										if err != nil {
+											ErrorBoxAction(serverWindow, err.Error())
+										}
 									}
 								},
 							},
@@ -234,12 +263,13 @@ func ServerWindows() error {
 						Children: []Widget{
 							NumberEdit{
 								AssignTo:    &serverInterval,
-								Value:       float64(ConfigGet().ServerInterval),
+								Value:       float64(configCache.ServerInterval),
 								ToolTipText: "1~60",
 								MaxValue:    60,
 								MinValue:    1,
 								OnValueChanged: func() {
-									err := ServerIntervalSave(int(serverInterval.Value()))
+									configCache.ServerInterval = int(serverInterval.Value())
+									err := configSyncToFile()
 									if err != nil {
 										ErrorBoxAction(serverWindow, err.Error())
 									}
@@ -251,17 +281,38 @@ func ServerWindows() error {
 						},
 					},
 					Label{
+						Text: "Service Port: ",
+					},
+					Composite{
+						Layout: HBox{MarginsZero: true},
+						Children: []Widget{
+							NumberEdit{
+								AssignTo: &serverPort,
+								Value:    float64(configCache.ServerPort),
+								MaxValue: 65535,
+								MinValue: 1,
+								OnValueChanged: func() {
+									configCache.ServerPort = int(serverPort.Value())
+									err := configSyncToFile()
+									if err != nil {
+										ErrorBoxAction(serverWindow, err.Error())
+									}
+								},
+							},
+							Label{
+								Text: " 1~65535",
+							},
+						},
+					},
+					Label{
 						Text: "Service Options: ",
 					},
 					Composite{
 						Layout: HBox{MarginsZero: true},
 						Children: []Widget{
-							CheckBox{
-								Text: "Auto Startup",
-							},
-							CheckBox{
-								Text: "Json Format",
-							},
+							MakeCheckBox("Auto Startup", &configCache.ServerAutoStartup, serverWindow),
+							MakeCheckBox("Auto Hide", &configCache.ServerAutoHide, serverWindow),
+							MakeCheckBox("Json Format", &configCache.ServerJsonFormat, serverWindow),
 						},
 					},
 					HSpacer{},
@@ -269,7 +320,7 @@ func ServerWindows() error {
 						AssignTo:    &serverActive,
 						Image:       ICON_Start,
 						MinSize:     Size{Width: 200},
-						Text:        " ",
+						Text:        "Startup",
 						ToolTipText: "Startup IPerf3 Server",
 						OnClicked: func() {
 							serverActive.SetEnabled(false)
