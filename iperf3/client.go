@@ -159,13 +159,6 @@ func ClientWindows() error {
 				},
 			},
 			Action{
-				Text: "Hide Window",
-				OnTriggered: func() {
-					NotifyInit()
-					clientWindow.SetVisible(false)
-				},
-			},
-			Action{
 				Text: "Sponsor",
 				OnTriggered: func() {
 					AboutAction(clientWindow)

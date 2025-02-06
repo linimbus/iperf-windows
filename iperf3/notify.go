@@ -58,7 +58,7 @@ func NotifyInit() {
 	})
 
 	serverBut := walk.NewAction()
-	err = serverBut.SetText("Show Server Windows")
+	err = serverBut.SetText("Show Windows")
 	if err != nil {
 		logs.Error("notify new action fail, %s", err.Error())
 		return
@@ -67,22 +67,6 @@ func NotifyInit() {
 	serverBut.Triggered().Attach(func() {
 		serverWindow.SetVisible(true)
 	})
-
-	clientBut := walk.NewAction()
-	err = clientBut.SetText("Show Client Windows")
-	if err != nil {
-		logs.Error("notify new action fail, %s", err.Error())
-		return
-	}
-
-	clientBut.Triggered().Attach(func() {
-		clientWindow.SetVisible(true)
-	})
-
-	if err := notify.ContextMenu().Actions().Add(clientBut); err != nil {
-		logs.Error("notify add action fail, %s", err.Error())
-		return
-	}
 
 	if err := notify.ContextMenu().Actions().Add(serverBut); err != nil {
 		logs.Error("notify add action fail, %s", err.Error())
@@ -100,7 +84,6 @@ func NotifyInit() {
 		}
 		now := time.Now()
 		if now.Sub(lastCheck) < time.Second {
-			clientWindow.SetVisible(true)
 			serverWindow.SetVisible(true)
 		}
 		lastCheck = now

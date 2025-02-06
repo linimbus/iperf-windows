@@ -1,18 +1,20 @@
 package iperf3
 
 import (
+	"encoding/json"
 	"fmt"
 	"net"
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
 	"github.com/astaxie/beego/logs"
 	"github.com/lxn/walk"
 )
 
 func VersionGet() string {
-	return "v0.1.0"
+	return "v0.2.0"
 }
 
 func SaveToFile(name string, body []byte) error {
@@ -103,4 +105,17 @@ func PasteClipboard(input string) error {
 		logs.Error(err.Error())
 	}
 	return err
+}
+
+func GetTimestamp() string {
+	return time.Now().Format("2006-01-02T15-04-05")
+}
+
+func FormatJSON(body []byte) ([]byte, error) {
+	var data interface{}
+	err := json.Unmarshal(body, &data)
+	if err != nil {
+		return nil, err
+	}
+	return json.MarshalIndent(data, "", "    ")
 }

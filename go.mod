@@ -3,7 +3,6 @@ module github.com/linimbus/iperf-windows
 go 1.21.3
 
 require (
-	github.com/GeertJohan/go.rice v1.0.3
 	github.com/astaxie/beego v1.12.3
 	github.com/lxn/walk v0.0.0-20210112085537-c389da54e794
 	github.com/lxn/win v0.0.0-20210218163916-a377121e959e

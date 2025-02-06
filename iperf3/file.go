@@ -64,7 +64,7 @@ func appDataDirInit() error {
 }
 
 func appInit(file string) error {
-	body, err := BoxFile().Bytes(file)
+	body, err := Asset(file)
 	if err != nil {
 		logs.Error(err.Error())
 		return err
@@ -77,18 +77,8 @@ func appInit(file string) error {
 	return nil
 }
 
-func FileInit() error {
-	err := appDataDirInit()
-	if err != nil {
-		return err
-	}
+func FileInit() {
+	appDataDirInit()
 	appInit("cygwin1.dll")
-	// if err != nil {
-	// 	return err
-	// }
 	appInit("iperf3.exe")
-	// if err != nil {
-	// 	return err
-	// }
-	return nil
 }

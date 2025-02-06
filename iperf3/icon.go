@@ -8,7 +8,7 @@ import (
 )
 
 func IconLoadFromBox(filename string, size walk.Size) *walk.Icon {
-	body, err := BoxFile().Bytes(filename)
+	body, err := Asset(filename)
 	if err != nil {
 		logs.Error(err.Error())
 		return nil

@@ -72,33 +72,27 @@ func configSyncToFile() error {
 	return os.WriteFile(configFilePath, value, 0664)
 }
 
-func ConfigInit() error {
-	configFilePath = fmt.Sprintf("%s%c%s", ConfigDirGet(), os.PathSeparator, "config.json")
-
+func ConfigInit(name string) {
+	configFilePath = fmt.Sprintf("%s%c%s", ConfigDirGet(), os.PathSeparator, name+".json")
 	_, err := os.Stat(configFilePath)
 	if err != nil {
 		err = configSyncToFile()
 		if err != nil {
 			logs.Error("config sync to file fail, %s", err.Error())
-			return err
+			return
 		}
 	}
-
 	value, err := os.ReadFile(configFilePath)
 	if err != nil {
 		logs.Error("read config file from app data dir fail, %s", err.Error())
 		configSyncToFile()
 
-		return err
+		return
 	}
-
 	err = json.Unmarshal(value, &configCache)
 	if err != nil {
 		logs.Error("json unmarshal config fail, %s", err.Error())
 		configSyncToFile()
-
-		return err
+		return
 	}
-
-	return nil
 }

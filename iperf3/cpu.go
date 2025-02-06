@@ -31,7 +31,7 @@ func init() {
 			ServerStatusUpdate(info)
 			ClientStatusUpdate(info)
 
-			logs.Info("system resource info %s", info)
+			// logs.Info("system resource info %s", info)
 		}
 	}()
 
