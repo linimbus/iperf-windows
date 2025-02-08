@@ -11,7 +11,7 @@ func IconLoadFromBox(filename string, size walk.Size) *walk.Icon {
 	body, err := Asset(filename)
 	if err != nil {
 		logs.Error(err.Error())
-		return nil
+		return walk.IconApplication()
 	}
 	dir := DEFAULT_HOME + "\\icon\\"
 	_, err = os.Stat(dir)
@@ -19,19 +19,19 @@ func IconLoadFromBox(filename string, size walk.Size) *walk.Icon {
 		err = os.MkdirAll(dir, 0644)
 		if err != nil {
 			logs.Error(err.Error())
-			return nil
+			return walk.IconApplication()
 		}
 	}
 	filepath := dir + filename
 	err = SaveToFile(filepath, body)
 	if err != nil {
 		logs.Error(err.Error())
-		return nil
+		return walk.IconApplication()
 	}
 	icon, err := walk.NewIconFromFileWithSize(filepath, size)
 	if err != nil {
 		logs.Error(err.Error())
-		return nil
+		return walk.IconApplication()
 	}
 	return icon
 }
@@ -42,25 +42,10 @@ var ICON_Start *walk.Icon
 var ICON_Stop *walk.Icon
 var ICON_Flow *walk.Icon
 
-var ICON_Max_Size = walk.Size{
-	Width: 64, Height: 64,
-}
-
-var ICON_Mid_Size = walk.Size{
-	Width: 48, Height: 48,
-}
-
-var ICON_Min_Size = walk.Size{
-	Width: 16, Height: 16,
-}
-
-func IconInit() error {
-	ICON_Main = IconLoadFromBox("main.ico", ICON_Max_Size)
-
-	ICON_Start = IconLoadFromBox("start.ico", ICON_Mid_Size)
-	ICON_Stop = IconLoadFromBox("stop.ico", ICON_Mid_Size)
-
-	ICON_Status = IconLoadFromBox("status.ico", ICON_Min_Size)
-	ICON_Flow = IconLoadFromBox("flow.ico", ICON_Min_Size)
-	return nil
+func IconInit() {
+	ICON_Main = IconLoadFromBox("main.ico", walk.Size{Width: 128, Height: 128})
+	ICON_Start = IconLoadFromBox("start.ico", walk.Size{Width: 64, Height: 64})
+	ICON_Stop = IconLoadFromBox("stop.ico", walk.Size{Width: 64, Height: 64})
+	ICON_Status = IconLoadFromBox("status.ico", walk.Size{Width: 16, Height: 16})
+	ICON_Flow = IconLoadFromBox("flow.ico", walk.Size{Width: 16, Height: 16})
 }

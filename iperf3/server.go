@@ -106,8 +106,8 @@ func ServerStatus(flag bool) {
 		serverActive.SetText("Stop")
 	} else {
 		serverActive.SetImage(ICON_Start)
-		serverActive.SetToolTipText("Startup IPerf3 Server")
-		serverActive.SetText("Startup")
+		serverActive.SetToolTipText("Start IPerf3 Server")
+		serverActive.SetText("Start")
 	}
 }
 
@@ -185,6 +185,7 @@ func ServerWindows() error {
 		StatusBarItems: []StatusBarItem{
 			{
 				AssignTo: &serverStatusBar,
+				Text:     cpuInfo(),
 				Icon:     ICON_Status,
 				Width:    160,
 			},
@@ -317,13 +318,16 @@ func ServerWindows() error {
 							MakeCheckBox("Json Format", &configCache.ServerJsonFormat, serverWindow),
 						},
 					},
-					HSpacer{},
+				},
+			},
+			Composite{
+				Layout: VBox{Margins: Margins{Top: 0, Bottom: 0, Left: 10, Right: 10}},
+				Children: []Widget{
 					PushButton{
-						AssignTo:    &serverActive,
-						Image:       ICON_Start,
-						MinSize:     Size{Width: 200},
-						Text:        "Startup",
-						ToolTipText: "Startup IPerf3 Server",
+						AssignTo: &serverActive,
+						Image:    ICON_Start,
+						MinSize:  Size{Width: 200},
+						Text:     "Start",
 						OnClicked: func() {
 							serverActive.SetEnabled(false)
 							go ServerSwitch()

@@ -34,7 +34,7 @@ type Config struct {
 }
 
 var configCache = Config{
-	ServerPort:        5012,
+	ServerPort:        5201,
 	ServerInterval:    1,
 	ServerLog:         "",
 	ServerAutoStartup: false,
@@ -42,7 +42,7 @@ var configCache = Config{
 	ServerJsonFormat:  true,
 
 	ClientAddress:       "127.0.0.1",
-	ClientPort:          5012,
+	ClientPort:          5201,
 	ClientRunTime:       10,
 	ClientOmitSec:       0,
 	ClientProtocol:      "tcp",

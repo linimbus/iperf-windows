@@ -5,9 +5,11 @@ cd ..
 cd server
 rsrc -manifest exe.manifest -ico ..\iperf3\main.ico
 go build -ldflags="-H windowsgui -w -s" -o ..\iperf3-server-windows.exe
+go build -o ..\iperf3-server-debug.exe
 cd ..
 
 cd client
 rsrc -manifest exe.manifest -ico ..\iperf3\main.ico
 go build -ldflags="-H windowsgui -w -s" -o ..\iperf3-client-windows.exe
+go build -o ..\iperf3-client-debug.exe
 cd ..

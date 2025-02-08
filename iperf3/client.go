@@ -168,6 +168,7 @@ func ClientWindows() error {
 		StatusBarItems: []StatusBarItem{
 			{
 				AssignTo: &clientStatusBar,
+				Text:     cpuInfo(),
 				Icon:     ICON_Status,
 				Width:    160,
 			},
