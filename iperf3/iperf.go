@@ -303,8 +303,8 @@ func ClientStartup() (*IperfServer, error) {
 	srv.cancel = cancel
 	srv.running = true
 
-	go ReaderScan("client stdout: ", stdout, "")
-	go ReaderScan("client stderr: ", stdErr, "")
+	go ReaderScan("client stdout: ", stdout, configCache.ClientLog)
+	go ReaderScan("client stderr: ", stdErr, configCache.ClientLog)
 
 	go func() {
 		exitCode := <-exitCode

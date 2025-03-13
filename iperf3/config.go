@@ -31,6 +31,7 @@ type Config struct {
 	ClientBandwidth     int
 	ClientBandwidthUnit string // KB,MB,GB
 	ClientDscp          int
+	ClientLog           string
 }
 
 var configCache = Config{
@@ -55,6 +56,7 @@ var configCache = Config{
 	ClientBandwidth:     0,
 	ClientBandwidthUnit: "MB",
 	ClientDscp:          0,
+	ClientLog:           "",
 }
 
 var configFilePath string
@@ -73,6 +75,19 @@ func configSyncToFile() error {
 }
 
 func ConfigInit(name string) {
+
+	defer func() {
+		if configCache.ClientLog == "" {
+			configCache.ClientLog = DataDirGet()
+		}
+
+		if configCache.ServerLog == "" {
+			configCache.ServerLog = DataDirGet()
+		}
+
+		configSyncToFile()
+	}()
+
 	configFilePath = fmt.Sprintf("%s%c%s", ConfigDirGet(), os.PathSeparator, name+".json")
 	_, err := os.Stat(configFilePath)
 	if err != nil {
@@ -86,7 +101,6 @@ func ConfigInit(name string) {
 	if err != nil {
 		logs.Error("read config file from app data dir fail, %s", err.Error())
 		configSyncToFile()
-
 		return
 	}
 	err = json.Unmarshal(value, &configCache)

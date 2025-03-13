@@ -200,7 +200,7 @@ func ServerWindows() error {
 				Layout: Grid{Columns: 2},
 				Children: []Widget{
 					Label{
-						Text: "Statistics Output: ",
+						Text: "Report Output: ",
 					},
 					Composite{
 						Layout: HBox{MarginsZero: true},
@@ -259,7 +259,7 @@ func ServerWindows() error {
 						},
 					},
 					Label{
-						Text: "Statistics Interval: ",
+						Text: "Report Interval: ",
 					},
 					Composite{
 						Layout: HBox{MarginsZero: true},

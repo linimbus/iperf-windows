@@ -6,7 +6,7 @@ import (
 
 func main() {
 	NAME := "client"
-	iperf.FileInit()
+	iperf.FileInit(NAME)
 	iperf.LogInit(NAME)
 	iperf.IconInit()
 	iperf.ConfigInit(NAME)

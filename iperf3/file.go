@@ -8,10 +8,11 @@ import (
 	"github.com/astaxie/beego/logs"
 )
 
-var DEFAULT_HOME string
+var _name string
+var _home string
 
 func RunlogDirGet() string {
-	dir := fmt.Sprintf("%s\\runlog", DEFAULT_HOME)
+	dir := fmt.Sprintf("%s\\runlog\\%s", _home, _name)
 	_, err := os.Stat(dir)
 	if err != nil {
 		os.MkdirAll(dir, 0644)
@@ -20,7 +21,7 @@ func RunlogDirGet() string {
 }
 
 func ConfigDirGet() string {
-	dir := fmt.Sprintf("%s\\config", DEFAULT_HOME)
+	dir := fmt.Sprintf("%s\\config\\%s", _home, _name)
 	_, err := os.Stat(dir)
 	if err != nil {
 		os.MkdirAll(dir, 0644)
@@ -29,7 +30,25 @@ func ConfigDirGet() string {
 }
 
 func ToolDirGet() string {
-	dir := fmt.Sprintf("%s\\bin", DEFAULT_HOME)
+	dir := fmt.Sprintf("%s\\bin", _home)
+	_, err := os.Stat(dir)
+	if err != nil {
+		os.MkdirAll(dir, 0644)
+	}
+	return dir
+}
+
+func IconDirGet() string {
+	dir := fmt.Sprintf("%s\\icon", _home)
+	_, err := os.Stat(dir)
+	if err != nil {
+		os.MkdirAll(dir, 0644)
+	}
+	return dir
+}
+
+func DataDirGet() string {
+	dir := fmt.Sprintf("%s\\data\\%s", _home, _name)
 	_, err := os.Stat(dir)
 	if err != nil {
 		os.MkdirAll(dir, 0644)
@@ -50,35 +69,32 @@ func appDataDir() string {
 	return datadir
 }
 
-func appDataDirInit() error {
+func appDataDirInit(name string) error {
 	dir := appDataDir()
 	_, err := os.Stat(dir)
 	if err != nil {
-		err = os.MkdirAll(dir, 0644)
-		if err != nil {
-			return err
-		}
+		os.MkdirAll(dir, 0644)
 	}
-	DEFAULT_HOME = dir
+	_home = dir
+	_name = name
 	return nil
 }
 
-func appInit(file string) error {
+func appInit(file string) {
 	body, err := Asset(file)
 	if err != nil {
-		logs.Error(err.Error())
-		return err
+		logs.Error("app init failed, %s", err.Error())
+		return
 	}
 	err = SaveToFile(filepath.Join(ToolDirGet(), file), body)
 	if err != nil {
-		logs.Error(err.Error())
-		return err
+		logs.Error("save to file failed, %s", err.Error())
+		return
 	}
-	return nil
 }
 
-func FileInit() {
-	appDataDirInit()
+func FileInit(name string) {
+	appDataDirInit(name)
 	appInit("cygwin1.dll")
 	appInit("iperf3.exe")
 }

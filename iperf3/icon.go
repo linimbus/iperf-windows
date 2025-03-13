@@ -1,7 +1,7 @@
 package iperf3
 
 import (
-	"os"
+	"path/filepath"
 
 	"github.com/astaxie/beego/logs"
 	"github.com/lxn/walk"
@@ -13,22 +13,15 @@ func IconLoadFromBox(filename string, size walk.Size) *walk.Icon {
 		logs.Error(err.Error())
 		return walk.IconApplication()
 	}
-	dir := DEFAULT_HOME + "\\icon\\"
-	_, err = os.Stat(dir)
-	if err != nil {
-		err = os.MkdirAll(dir, 0644)
-		if err != nil {
-			logs.Error(err.Error())
-			return walk.IconApplication()
-		}
-	}
-	filepath := dir + filename
-	err = SaveToFile(filepath, body)
+
+	file := filepath.Join(IconDirGet(), filename)
+
+	err = SaveToFile(file, body)
 	if err != nil {
 		logs.Error(err.Error())
 		return walk.IconApplication()
 	}
-	icon, err := walk.NewIconFromFileWithSize(filepath, size)
+	icon, err := walk.NewIconFromFileWithSize(file, size)
 	if err != nil {
 		logs.Error(err.Error())
 		return walk.IconApplication()

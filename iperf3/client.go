@@ -2,11 +2,13 @@ package iperf3
 
 import (
 	"fmt"
+	"os"
 	"time"
 
 	"github.com/astaxie/beego/logs"
 	"github.com/lxn/walk"
 	. "github.com/lxn/walk/declarative"
+	"github.com/lxn/win"
 )
 
 var clientWindow *walk.MainWindow
@@ -17,6 +19,8 @@ var clientProcessBar *walk.ProgressBar
 var clientNumberList []*walk.NumberEdit
 var clientCheckBoxList []*walk.CheckBox
 var clientActive *walk.PushButton
+var clientFolder *walk.LineEdit
+var clientFolderBut *walk.PushButton
 
 func init() {
 	clientNumberList = make([]*walk.NumberEdit, 0)
@@ -96,6 +100,8 @@ func ClientEnable(flag bool) {
 	}
 
 	clientActive.SetEnabled(flag)
+	clientFolder.SetEnabled(flag)
+	clientFolderBut.SetEnabled(flag)
 }
 
 func ClientActive() {
@@ -248,7 +254,7 @@ func ClientWindows() error {
 					},
 					MakeNumberEdit(65535, 0, "", &configCache.ClientPayload, clientWindow),
 
-					MakeClientCheckBox("Dont Fragment", "Set IPv4 Don't Fragment flag", &configCache.ClientDontFragment, clientWindow),
+					MakeClientCheckBox("No Delay", "Set TCP/SCTP no delay, disabling Nagle's Algorithm", &configCache.ClientNoDelay, clientWindow),
 					MakeClientCheckBox("Json Format", "Report in JSON format", &configCache.ClientJsonFormat, clientWindow),
 
 					Label{
@@ -258,7 +264,7 @@ func ClientWindows() error {
 					MakeNumberEdit(63, 0, "", &configCache.ClientDscp, clientWindow),
 
 					MakeClientCheckBox("Zero Copy", "Use a 'zero copy' method of sending data", &configCache.ClientZeroCopy, clientWindow),
-					MakeClientCheckBox("No Delay", "Set TCP/SCTP no delay, disabling Nagle's Algorithm", &configCache.ClientNoDelay, clientWindow),
+					MakeClientCheckBox("Dont Fragment", "Set IPv4 Don't Fragment flag", &configCache.ClientDontFragment, clientWindow),
 
 					Label{
 						Text:        "Bandwidth: ",
@@ -295,8 +301,68 @@ func ClientWindows() error {
 							},
 						},
 					},
+
+					HSpacer{},
+					HSpacer{},
+
+					Label{
+						Text: "Report Output: ",
+					},
+					LineEdit{
+						ColumnSpan: 2,
+						AssignTo:   &clientFolder,
+						Text:       configCache.ClientLog,
+						OnEditingFinished: func() {
+							dir := clientFolder.Text()
+							if dir != "" {
+								stat, err := os.Stat(dir)
+								if err != nil {
+									ErrorBoxAction(clientWindow, "The client folder is not exist")
+									clientFolder.SetText("")
+									dir = ""
+								} else if !stat.IsDir() {
+									ErrorBoxAction(clientWindow, "The client folder is not directory")
+									clientFolder.SetText("")
+									dir = ""
+								}
+							}
+							configCache.ClientLog = dir
+							err := configSyncToFile()
+							if err != nil {
+								ErrorBoxAction(clientWindow, err.Error())
+							}
+						},
+					},
+					PushButton{
+						AssignTo: &clientFolderBut,
+						MaxSize:  Size{Width: 30},
+						Text:     " ... ",
+						OnClicked: func() {
+							dlgDir := new(walk.FileDialog)
+							dlgDir.FilePath = configCache.ClientLog
+							dlgDir.Flags = win.OFN_EXPLORER
+							dlgDir.Title = "Please select a folder as output file directory"
+
+							exist, err := dlgDir.ShowBrowseFolder(clientWindow)
+							if err != nil {
+								logs.Error(err.Error())
+								return
+							}
+							if exist {
+								logs.Info("select %s as output file directory", dlgDir.FilePath)
+
+								clientFolder.SetText(dlgDir.FilePath)
+								configCache.ClientLog = dlgDir.FilePath
+								err := configSyncToFile()
+								if err != nil {
+									ErrorBoxAction(clientWindow, err.Error())
+								}
+							}
+						},
+					},
 				},
 			},
+
 			Composite{
 				Layout: HBox{Margins: Margins{Top: 0, Bottom: 0, Left: 12, Right: 12}},
 				Children: []Widget{
