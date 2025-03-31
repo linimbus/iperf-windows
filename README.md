@@ -1,5 +1,9 @@
 # iperf-windows
 
+[![Download IPerf3-Windows](https://img.shields.io/sourceforge/dm/iperf3-windows.svg)](https://sourceforge.net/projects/iperf3-windows/files/latest/download)
+
+[![Download IPerf3-Windows](https://a.fsdn.com/con/app/sf-download-button)](https://sourceforge.net/projects/iperf3-windows/files/latest/download)
+
 ### 准备环境
 
 - Windows10/11 64位
