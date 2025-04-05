@@ -11,6 +11,8 @@ import (
 var _name string
 var _home string
 
+var APPLICATION_NAME = "Iperf3Windows"
+
 func RunlogDirGet() string {
 	dir := fmt.Sprintf("%s\\runlog\\%s", _home, _name)
 	_, err := os.Stat(dir)
@@ -64,7 +66,7 @@ func appDataDir() string {
 	if datadir == "" {
 		datadir = ".\\"
 	} else {
-		datadir = fmt.Sprintf("%s\\Iperf3Windows", datadir)
+		datadir = filepath.Join(datadir, APPLICATION_NAME)
 	}
 	return datadir
 }

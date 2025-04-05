@@ -1,11 +1,10 @@
 package iperf3
 
 import (
-	"bufio"
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
+	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
@@ -109,15 +108,23 @@ type Result struct {
 type IperfServer struct {
 	running  bool
 	exitCode int
-	stdOut   io.ReadCloser
-	stdErr   io.ReadCloser
+	stdOut   string
+	stdErr   string
 	cancel   context.CancelFunc
 }
 
-func ExecuteAsync(binary string, cmd []string) (stdOut io.ReadCloser, stdErr io.ReadCloser, cancel context.CancelFunc, exitCode chan int, err error) {
-	exitCode = make(chan int)
-
+func ExecuteAsync(binary string, cmd []string) (*os.File, *os.File, context.CancelFunc, chan int, error) {
 	logs.Info("ExecuteAsync %s %v", binary, cmd)
+
+	stdoutTmp, err := os.CreateTemp("", "iperf3_win_stdout_*.json")
+	if err != nil {
+		return nil, nil, nil, nil, err
+	}
+
+	stderrTmp, err := os.CreateTemp("", "iperf3_win_stderr_*.json")
+	if err != nil {
+		return nil, nil, nil, nil, err
+	}
 
 	ctx, cancel := context.WithCancel(context.Background())
 	exe := exec.CommandContext(ctx, binary, cmd...)
@@ -125,22 +132,21 @@ func ExecuteAsync(binary string, cmd []string) (stdOut io.ReadCloser, stdErr io.
 		HideWindow: true,
 	}
 
-	stdOut, err = exe.StdoutPipe()
-	if err != nil {
-		defer cancel()
-		return nil, nil, nil, nil, err
-	}
-	stdErr, err = exe.StderrPipe()
-	if err != nil {
-		defer cancel()
-		return nil, nil, nil, nil, err
-	}
+	exe.Stdout = stdoutTmp
+	exe.Stderr = stderrTmp
+
 	err = exe.Start()
 	if err != nil {
 		defer cancel()
 		return nil, nil, nil, nil, err
 	}
+
+	exitCode := make(chan int)
+
 	go func() {
+		defer stdoutTmp.Close()
+		defer stderrTmp.Close()
+
 		if err := exe.Wait(); err != nil {
 			if exiterr, ok := err.(*exec.ExitError); ok {
 				if status, ok := exiterr.Sys().(syscall.WaitStatus); ok {
@@ -151,7 +157,8 @@ func ExecuteAsync(binary string, cmd []string) (stdOut io.ReadCloser, stdErr io.
 			exitCode <- 0
 		}
 	}()
-	return stdOut, stdErr, cancel, exitCode, nil
+
+	return stdoutTmp, stderrTmp, cancel, exitCode, nil
 }
 
 func (s *IperfServer) Shutdown() {
@@ -162,42 +169,35 @@ func (s *IperfServer) Shutdown() {
 	}
 }
 
-func ReaderScan(prefix string, buff io.ReadCloser, outputDir string) {
-	if buff == nil {
-		logs.Info("unable to read, ReadCloser is nil")
+func ReadResult(filePath string, outputDir string) {
+	text, err := os.ReadFile(filePath)
+	if err != nil {
+		logs.Error("read file %s failed, %s", filePath, err.Error())
 		return
 	}
-	defer buff.Close()
 
-	text := make([]byte, 0)
-
-	scanner := bufio.NewScanner(buff)
-	scanner.Buffer(make([]byte, 0, 64*1024), 1024*1024)
-
-	for scanner.Scan() {
-		text = append(text, scanner.Bytes()...)
-		if json.Valid(text) {
-			jsonFmt, err := FormatJSON(text)
-			if err != nil {
-				logs.Warning("json format fail, %s", err.Error())
-			} else {
-				text = jsonFmt
-			}
-
-			logs.Info("%s -> %s", prefix, text)
-
-			if outputDir != "" {
-				SaveToFile(filepath.Join(outputDir, fmt.Sprintf("iperf3_%s.json", GetTimestamp())), text)
-			}
-
-			var result Result
-			if err := json.Unmarshal(text, &result); err != nil {
-				logs.Info("json unmarshal fail, %s", err.Error())
-			}
-
-			text = make([]byte, 0)
-		}
+	if !json.Valid(text) {
+		logs.Error("json invalid, %s", string(text))
+		return
 	}
+
+	text, err = FormatJSON(text)
+	if err != nil {
+		logs.Warning("json format fail, %s", err.Error())
+		return
+	}
+
+	logs.Info("iperf3 result: %s", string(text))
+
+	if outputDir != "" {
+		SaveToFile(filepath.Join(outputDir, fmt.Sprintf("iperf3_%s.json", GetTimestamp())), text)
+	}
+
+	var result Result
+	if err := json.Unmarshal(text, &result); err != nil {
+		logs.Info("json unmarshal fail, %s", err.Error())
+	}
+	// TBD
 }
 
 func ServerStartup() (*IperfServer, error) {
@@ -227,16 +227,16 @@ func ServerStartup() (*IperfServer, error) {
 	}
 
 	srv := new(IperfServer)
-	srv.stdOut = stdout
-	srv.stdErr = stdErr
+	srv.stdOut = stdout.Name()
+	srv.stdErr = stdErr.Name()
 	srv.cancel = cancel
 	srv.running = true
 
-	go ReaderScan("server_stdout: ", stdout, configCache.ServerLog)
-	go ReaderScan("server_stderr: ", stdErr, configCache.ServerLog)
-
 	go func() {
 		exitCode := <-exitCode
+
+		ReadResult(stdout.Name(), configCache.ServerLog)
+		ReadResult(stdErr.Name(), configCache.ServerLog)
 
 		srv.exitCode = exitCode
 		srv.running = false
@@ -298,16 +298,16 @@ func ClientStartup() (*IperfServer, error) {
 	}
 
 	srv := new(IperfServer)
-	srv.stdOut = stdout
-	srv.stdErr = stdErr
+	srv.stdOut = stdout.Name()
+	srv.stdErr = stdErr.Name()
 	srv.cancel = cancel
 	srv.running = true
 
-	go ReaderScan("client stdout: ", stdout, configCache.ClientLog)
-	go ReaderScan("client stderr: ", stdErr, configCache.ClientLog)
-
 	go func() {
 		exitCode := <-exitCode
+
+		ReadResult(stdout.Name(), configCache.ClientLog)
+		ReadResult(stdErr.Name(), configCache.ClientLog)
 
 		srv.exitCode = exitCode
 		srv.running = false

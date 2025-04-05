@@ -333,31 +333,41 @@ func ClientWindows() error {
 							}
 						},
 					},
-					PushButton{
-						AssignTo: &clientFolderBut,
-						MaxSize:  Size{Width: 30},
-						Text:     " ... ",
-						OnClicked: func() {
-							dlgDir := new(walk.FileDialog)
-							dlgDir.FilePath = configCache.ClientLog
-							dlgDir.Flags = win.OFN_EXPLORER
-							dlgDir.Title = "Please select a folder as output file directory"
+					Composite{
+						Layout: HBox{MarginsZero: true},
+						Children: []Widget{
+							PushButton{
+								AssignTo: &clientFolderBut,
+								Text:     "...",
+								OnClicked: func() {
+									dlgDir := new(walk.FileDialog)
+									dlgDir.FilePath = configCache.ClientLog
+									dlgDir.Flags = win.OFN_EXPLORER
+									dlgDir.Title = "Please select a folder as output file directory"
 
-							exist, err := dlgDir.ShowBrowseFolder(clientWindow)
-							if err != nil {
-								logs.Error(err.Error())
-								return
-							}
-							if exist {
-								logs.Info("select %s as output file directory", dlgDir.FilePath)
+									exist, err := dlgDir.ShowBrowseFolder(clientWindow)
+									if err != nil {
+										logs.Error(err.Error())
+										return
+									}
+									if exist {
+										logs.Info("select %s as output file directory", dlgDir.FilePath)
 
-								clientFolder.SetText(dlgDir.FilePath)
-								configCache.ClientLog = dlgDir.FilePath
-								err := configSyncToFile()
-								if err != nil {
-									ErrorBoxAction(clientWindow, err.Error())
-								}
-							}
+										clientFolder.SetText(dlgDir.FilePath)
+										configCache.ClientLog = dlgDir.FilePath
+										err := configSyncToFile()
+										if err != nil {
+											ErrorBoxAction(clientWindow, err.Error())
+										}
+									}
+								},
+							},
+							PushButton{
+								Text: "Open",
+								OnClicked: func() {
+									OpenBrowserWeb(configCache.ClientLog)
+								},
+							},
 						},
 					},
 				},

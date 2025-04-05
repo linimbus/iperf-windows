@@ -231,8 +231,7 @@ func ServerWindows() error {
 							},
 							PushButton{
 								AssignTo: &serverFolderBut,
-								MaxSize:  Size{Width: 30},
-								Text:     " ... ",
+								Text:     "...",
 								OnClicked: func() {
 									dlgDir := new(walk.FileDialog)
 									dlgDir.FilePath = configCache.ServerLog
@@ -254,6 +253,12 @@ func ServerWindows() error {
 											ErrorBoxAction(serverWindow, err.Error())
 										}
 									}
+								},
+							},
+							PushButton{
+								Text: "Open",
+								OnClicked: func() {
+									OpenBrowserWeb(configCache.ServerLog)
 								},
 							},
 						},

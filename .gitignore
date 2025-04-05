@@ -22,3 +22,4 @@ go.work.sum
 .env
 *.syso
 iperf3-*.exe
+*.zip

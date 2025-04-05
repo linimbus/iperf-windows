@@ -14,7 +14,7 @@ import (
 )
 
 func VersionGet() string {
-	return "v0.3.0"
+	return "v0.3.1"
 }
 
 func SaveToFile(name string, body []byte) error {
@@ -109,6 +109,10 @@ func PasteClipboard(input string) error {
 
 func GetTimestamp() string {
 	return time.Now().Format("2006-01-02T15-04-05")
+}
+
+func GetTimestampUS() int64 {
+	return time.Now().UnixNano()
 }
 
 func FormatJSON(body []byte) ([]byte, error) {

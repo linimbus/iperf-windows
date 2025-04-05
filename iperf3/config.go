@@ -2,8 +2,8 @@ package iperf3
 
 import (
 	"encoding/json"
-	"fmt"
 	"os"
+	"path/filepath"
 	"sync"
 
 	"github.com/astaxie/beego/logs"
@@ -88,7 +88,7 @@ func ConfigInit(name string) {
 		configSyncToFile()
 	}()
 
-	configFilePath = fmt.Sprintf("%s%c%s", ConfigDirGet(), os.PathSeparator, name+".json")
+	configFilePath = filepath.Join(ConfigDirGet(), name+".json")
 	_, err := os.Stat(configFilePath)
 	if err != nil {
 		err = configSyncToFile()
