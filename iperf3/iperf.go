@@ -200,7 +200,7 @@ func ReadResult(filePath string, outputDir string) {
 	// TBD
 }
 
-func ServerStartup() (*IperfServer, error) {
+func ServerStartup(index int) (*IperfServer, error) {
 	value, err := json.Marshal(configCache)
 	if err != nil {
 		logs.Error("json marshal config fail, %s", err.Error())
@@ -210,7 +210,9 @@ func ServerStartup() (*IperfServer, error) {
 
 	builder := strings.Builder{}
 	builder.WriteString(" -s")
-	fmt.Fprintf(&builder, " --port %d", configCache.ServerPort)
+
+	fmt.Fprintf(&builder, " -B %s", configCache.ServerListen)
+	fmt.Fprintf(&builder, " --port %d", configCache.ServerPort+index)
 
 	if configCache.ServerInterval > 0 {
 		fmt.Fprintf(&builder, " --interval %d", configCache.ServerInterval)
@@ -219,6 +221,8 @@ func ServerStartup() (*IperfServer, error) {
 	if configCache.ServerJsonFormat {
 		fmt.Fprintf(&builder, " --json %d", configCache.ServerInterval)
 	}
+
+	fmt.Fprintf(&builder, " --forceflush")
 
 	stdout, stdErr, cancel, exitCode, err := ExecuteAsync(filepath.Join(ToolDirGet(), "iperf3.exe"), strings.Fields(builder.String()))
 	if err != nil {
@@ -245,17 +249,19 @@ func ServerStartup() (*IperfServer, error) {
 	return srv, nil
 }
 
-func ClientStartup() (*IperfServer, error) {
+func ClientStartup(cnt int) (*IperfServer, error) {
 
 	value, err := json.Marshal(configCache)
 	if err != nil {
 		logs.Error("json marshal config fail, %s", err.Error())
 	} else {
-		logs.Info("iperf client options %s", string(value))
+		logs.Info("iperf client run times %d with options %s", cnt, string(value))
 	}
 
 	builder := strings.Builder{}
-	fmt.Fprintf(&builder, "-c %s", configCache.ClientAddress)
+
+	fmt.Fprintf(&builder, " -B %s", configCache.ClientListen)
+	fmt.Fprintf(&builder, " -c %s", configCache.ClientAddress)
 	fmt.Fprintf(&builder, " -p %d", configCache.ClientPort)
 	fmt.Fprintf(&builder, " -t %d", configCache.ClientRunTime)
 	fmt.Fprintf(&builder, " -P %d", configCache.ClientStreams)
@@ -279,6 +285,14 @@ func ClientStartup() (*IperfServer, error) {
 
 	if configCache.ClientZeroCopy {
 		builder.WriteString(" -Z")
+	}
+
+	if configCache.ClientReverseMode {
+		builder.WriteString(" -R")
+	}
+
+	if configCache.ClientBidirectionalMode {
+		builder.WriteString(" --bidir")
 	}
 
 	if configCache.ClientPayload > 0 {

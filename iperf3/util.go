@@ -14,7 +14,7 @@ import (
 )
 
 func VersionGet() string {
-	return "v0.3.1"
+	return "v0.3.2"
 }
 
 func SaveToFile(name string, body []byte) error {
@@ -72,7 +72,7 @@ func InterfaceOptions() []string {
 	output := []string{"0.0.0.0", "::"}
 	ifaces, err := net.Interfaces()
 	if err != nil {
-		logs.Error(err.Error())
+		logs.Error("interface query failed, %s", err.Error())
 		return output
 	}
 	for _, v := range ifaces {
@@ -81,6 +81,7 @@ func InterfaceOptions() []string {
 		}
 		address, err := InterfaceGet(&v)
 		if err != nil {
+			logs.Warning("interface get failed, %s", err.Error())
 			continue
 		}
 		for _, addr := range address {
@@ -88,6 +89,15 @@ func InterfaceOptions() []string {
 		}
 	}
 	return output
+}
+
+func InterfaceIndex(name string, interfaces []string) int {
+	for i, v := range interfaces {
+		if v == name {
+			return i
+		}
+	}
+	return 0
 }
 
 func CopyClipboard() (string, error) {

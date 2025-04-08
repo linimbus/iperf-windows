@@ -10,53 +10,67 @@ import (
 )
 
 type Config struct {
+	ServerListen      string
 	ServerPort        int
+	ServerCount       int
 	ServerInterval    int
 	ServerLog         string
 	ServerAutoStartup bool
 	ServerAutoHide    bool
 	ServerJsonFormat  bool
 
-	ClientAddress       string
-	ClientPort          int
-	ClientRunTime       int
-	ClientOmitSec       int
-	ClientProtocol      string
-	ClientPayload       int
-	ClientJsonFormat    bool
-	ClientDontFragment  bool
-	ClientZeroCopy      bool
-	ClientNoDelay       bool
-	ClientStreams       int
-	ClientBandwidth     int
-	ClientBandwidthUnit string // KB,MB,GB
-	ClientDscp          int
-	ClientLog           string
+	ClientListen            string
+	ClientAddress           string
+	ClientPort              int
+	ClientRunTime           int
+	ClientOmitSec           int
+	ClientProtocol          string
+	ClientPayload           int
+	ClientJsonFormat        bool
+	ClientDontFragment      bool
+	ClientZeroCopy          bool
+	ClientNoDelay           bool
+	ClientReverseMode       bool
+	ClientBidirectionalMode bool
+	ClientStreams           int
+	ClientBandwidth         int
+	ClientBandwidthUnit     string // KB,MB,GB
+	ClientDscp              int
+	ClientRepeatCount       int
+	ClientRepeatInterval    int
+	ClientLog               string
 }
 
 var configCache = Config{
+	ServerListen:      "0.0.0.0",
 	ServerPort:        5201,
+	ServerCount:       1,
 	ServerInterval:    1,
 	ServerLog:         "",
 	ServerAutoStartup: false,
 	ServerAutoHide:    false,
 	ServerJsonFormat:  true,
 
-	ClientAddress:       "127.0.0.1",
-	ClientPort:          5201,
-	ClientRunTime:       10,
-	ClientOmitSec:       0,
-	ClientProtocol:      "tcp",
-	ClientPayload:       1024,
-	ClientJsonFormat:    true,
-	ClientDontFragment:  false,
-	ClientZeroCopy:      false,
-	ClientNoDelay:       false,
-	ClientStreams:       1,
-	ClientBandwidth:     0,
-	ClientBandwidthUnit: "MB",
-	ClientDscp:          0,
-	ClientLog:           "",
+	ClientListen:            "0.0.0.0",
+	ClientAddress:           "127.0.0.1",
+	ClientPort:              5201,
+	ClientRunTime:           10,
+	ClientOmitSec:           0,
+	ClientProtocol:          "tcp",
+	ClientPayload:           1024,
+	ClientJsonFormat:        true,
+	ClientDontFragment:      false,
+	ClientZeroCopy:          false,
+	ClientNoDelay:           false,
+	ClientReverseMode:       false,
+	ClientBidirectionalMode: false,
+	ClientStreams:           1,
+	ClientBandwidth:         0,
+	ClientBandwidthUnit:     "MB",
+	ClientDscp:              0,
+	ClientRepeatCount:       1,
+	ClientRepeatInterval:    0,
+	ClientLog:               "",
 }
 
 var configFilePath string

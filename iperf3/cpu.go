@@ -26,12 +26,10 @@ func cpuInfo() string {
 func init() {
 	go func() {
 		for {
-			time.Sleep(time.Second * 2)
-
+			time.Sleep(time.Second * 5)
 			info := cpuInfo()
 			ServerStatusUpdate(info)
 			ClientStatusUpdate(info)
-
 			// logs.Info("system resource info %s", info)
 		}
 	}()

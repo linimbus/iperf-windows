@@ -14,13 +14,15 @@ import (
 var clientWindow *walk.MainWindow
 var clientStatusBar, clientFlowBar *walk.StatusBarItem
 var clientAddress *walk.LineEdit
-var clientProtocol, clientBandwidthUnit *walk.ComboBox
+var clientProtocol, clientBandwidthUnit, clientListen *walk.ComboBox
 var clientProcessBar *walk.ProgressBar
 var clientNumberList []*walk.NumberEdit
 var clientCheckBoxList []*walk.CheckBox
 var clientActive *walk.PushButton
 var clientFolder *walk.LineEdit
 var clientFolderBut *walk.PushButton
+var clientReverseMode *walk.CheckBox
+var clientBidirectionalMode *walk.CheckBox
 
 func init() {
 	clientNumberList = make([]*walk.NumberEdit, 0)
@@ -30,10 +32,11 @@ func init() {
 func MakeClientCheckBox(name, tips string, cfg *bool, form walk.Form) CheckBox {
 	var box *walk.CheckBox
 	return CheckBox{
-		AssignTo:    &box,
-		Text:        name,
-		ToolTipText: tips,
-		Checked:     *cfg,
+		AssignTo:      &box,
+		Text:          name,
+		ToolTipText:   tips,
+		Checked:       *cfg,
+		StretchFactor: 2,
 		OnCheckedChanged: func() {
 			*cfg = box.Checked()
 			err := configSyncToFile()
@@ -50,7 +53,8 @@ func MakeClientCheckBox(name, tips string, cfg *bool, form walk.Form) CheckBox {
 func MakeNumberEdit(max, min int, tips string, cfg *int, form walk.Form) Composite {
 	var number *walk.NumberEdit
 	return Composite{
-		Layout: HBox{MarginsZero: true},
+		Layout:        HBox{MarginsZero: true},
+		StretchFactor: 2,
 		Children: []Widget{
 			NumberEdit{
 				AssignTo:    &number,
@@ -80,6 +84,7 @@ func ClientEnable(flag bool) {
 	clientAddress.SetEnabled(flag)
 	clientProtocol.SetEnabled(flag)
 	clientBandwidthUnit.SetEnabled(flag)
+	clientListen.SetEnabled(flag)
 
 	for _, but := range clientNumberList {
 		but.SetEnabled(flag)
@@ -107,23 +112,28 @@ func ClientEnable(flag bool) {
 func ClientActive() {
 	defer ClientEnable(true)
 
-	c, err := ClientStartup()
-	if err != nil {
-		ErrorBoxAction(clientWindow, err.Error())
-		return
-	}
-
-	for i := 0; ; i++ {
-		if !c.running {
-			break
+	for i := 0; i < configCache.ClientRepeatCount; i++ {
+		client, err := ClientStartup(i)
+		if err != nil {
+			ErrorBoxAction(clientWindow, err.Error())
+			return
 		}
-		time.Sleep(time.Second)
+		clientProcessBar.SetValue(0)
 
-		if i > configCache.ClientRunTime {
-			clientProcessBar.SetValue(100)
-		} else {
-			clientProcessBar.SetValue((i * 100) / (configCache.ClientRunTime))
+		for i := 0; ; i++ {
+			if !client.running {
+				break
+			}
+			time.Sleep(time.Second)
+
+			if i > configCache.ClientRunTime {
+				clientProcessBar.SetValue(100)
+			} else {
+				clientProcessBar.SetValue((i * 100) / (configCache.ClientRunTime))
+			}
 		}
+		clientProcessBar.SetValue(100)
+		time.Sleep(time.Second * time.Duration(configCache.ClientRepeatInterval))
 	}
 
 	time.Sleep(time.Millisecond * 100)
@@ -149,12 +159,14 @@ func ClientClose() {
 func ClientWindows() error {
 	CapSignal(ClientClose)
 
+	interfaces := InterfaceOptions()
+
 	cnt, err := MainWindow{
 		Title:    "IPerf3 Client " + VersionGet(),
 		Icon:     ICON_Main,
 		AssignTo: &clientWindow,
-		MinSize:  Size{Width: 400, Height: 250},
-		Size:     Size{Width: 400, Height: 250},
+		MinSize:  Size{Width: 600, Height: 250},
+		Size:     Size{Width: 600, Height: 250},
 		Layout:   VBox{Margins: Margins{Top: 5, Bottom: 5, Left: 5, Right: 5}},
 		Font:     Font{Bold: true},
 		MenuItems: []MenuItem{
@@ -186,15 +198,17 @@ func ClientWindows() error {
 		},
 		Children: []Widget{
 			Composite{
-				Layout: Grid{Columns: 4},
+				Layout: Grid{Columns: 4, Spacing: 6},
 				Children: []Widget{
 					Label{
-						Text:        "Server Address: ",
-						ToolTipText: "Set server ip address to connect",
+						Text:          "Server Address: ",
+						ToolTipText:   "Set server ip address to connect",
+						StretchFactor: 1,
 					},
 					LineEdit{
-						AssignTo: &clientAddress,
-						Text:     configCache.ClientAddress,
+						AssignTo:      &clientAddress,
+						Text:          configCache.ClientAddress,
+						StretchFactor: 2,
 						OnEditingFinished: func() {
 							configCache.ClientAddress = clientAddress.Text()
 							err := configSyncToFile()
@@ -203,17 +217,42 @@ func ClientWindows() error {
 							}
 						},
 					},
+
 					Label{
-						Text:        "Port: ",
-						ToolTipText: "Set server port to connect",
-					},
-					MakeNumberEdit(65535, 1, "1~65535", &configCache.ClientPort, clientWindow),
-					Label{
-						Text:        "Protocol: ",
-						ToolTipText: "Using UDP or TCP protocol",
+						Text:          "Listen Address: ",
+						ToolTipText:   "Set client ip address to bind to",
+						StretchFactor: 1,
 					},
 					ComboBox{
-						AssignTo: &clientProtocol,
+						MaxSize:       Size{Width: 200},
+						StretchFactor: 2,
+						AssignTo:      &clientListen,
+						CurrentIndex:  InterfaceIndex(configCache.ClientListen, interfaces),
+						Model:         interfaces,
+						OnCurrentIndexChanged: func() {
+							configCache.ClientListen = clientListen.Text()
+							err := configSyncToFile()
+							if err != nil {
+								ErrorBoxAction(clientWindow, err.Error())
+							}
+						},
+					},
+
+					Label{
+						Text:          "Port: ",
+						ToolTipText:   "Set server port to connect",
+						StretchFactor: 1,
+					},
+					MakeNumberEdit(65535, 1, "", &configCache.ClientPort, clientWindow),
+
+					Label{
+						Text:          "Protocol: ",
+						ToolTipText:   "Using UDP or TCP protocol",
+						StretchFactor: 1,
+					},
+					ComboBox{
+						AssignTo:      &clientProtocol,
+						StretchFactor: 2,
 						CurrentIndex: func() int {
 							if configCache.ClientProtocol == "tcp" {
 								return 0
@@ -231,47 +270,48 @@ func ClientWindows() error {
 					},
 
 					Label{
-						Text:        "Run Time: ",
-						ToolTipText: "Set the time in seconds to transmit for (default 10 secs)",
+						Text:          "Run Time: ",
+						ToolTipText:   "Set the time in seconds to transmit for (default 10 secs)",
+						StretchFactor: 1,
 					},
 					MakeNumberEdit(3600, 1, "Seconds", &configCache.ClientRunTime, clientWindow),
 
 					Label{
-						Text:        "Streams: ",
-						ToolTipText: "Set the number of parallel client streams to run",
+						Text:          "Streams: ",
+						ToolTipText:   "Set the number of parallel client streams to run",
+						StretchFactor: 1,
 					},
 					MakeNumberEdit(1024, 1, "", &configCache.ClientStreams, clientWindow),
 
 					Label{
-						Text:        "Omit Time: ",
-						ToolTipText: "Set perform pre-test for N seconds and omit the pre-test statistics",
+						Text:          "Omit Time: ",
+						ToolTipText:   "Set perform pre-test for N seconds and omit the pre-test statistics",
+						StretchFactor: 1,
 					},
 					MakeNumberEdit(120, 0, "Seconds", &configCache.ClientOmitSec, clientWindow),
 
 					Label{
-						Text:        "Packet Length: ",
-						ToolTipText: "Set the packet length of buffer to read or write (0 as default value 128 KB for TCP, dynamic or 1460 for UDP)",
+						Text:          "Packet Length: ",
+						ToolTipText:   "Set the packet length of buffer to read or write (0 as default value 128 KB for TCP, dynamic or 1460 for UDP)",
+						StretchFactor: 1,
 					},
 					MakeNumberEdit(65535, 0, "", &configCache.ClientPayload, clientWindow),
 
-					MakeClientCheckBox("No Delay", "Set TCP/SCTP no delay, disabling Nagle's Algorithm", &configCache.ClientNoDelay, clientWindow),
-					MakeClientCheckBox("Json Format", "Report in JSON format", &configCache.ClientJsonFormat, clientWindow),
-
 					Label{
-						Text:        "IP Dscp: ",
-						ToolTipText: "Set the IP dscp value, either 0-63 or symbolic. Numeric values can be specified in decimal,",
+						Text:          "IP Dscp: ",
+						ToolTipText:   "Set the IP dscp value, either 0-63 or symbolic. Numeric values can be specified in decimal,",
+						StretchFactor: 1,
 					},
 					MakeNumberEdit(63, 0, "", &configCache.ClientDscp, clientWindow),
 
-					MakeClientCheckBox("Zero Copy", "Use a 'zero copy' method of sending data", &configCache.ClientZeroCopy, clientWindow),
-					MakeClientCheckBox("Dont Fragment", "Set IPv4 Don't Fragment flag", &configCache.ClientDontFragment, clientWindow),
-
 					Label{
-						Text:        "Bandwidth: ",
-						ToolTipText: "Target bitrate in bits/sec (0 for unlimited) (default 1 Mbit/sec for UDP, unlimited for TCP)",
+						Text:          "Bandwidth: ",
+						ToolTipText:   "Target bitrate in bits/sec (0 for unlimited) (default 1 Mbit/sec for UDP, unlimited for TCP)",
+						StretchFactor: 1,
 					},
 					Composite{
-						Layout: HBox{MarginsZero: true},
+						Layout:        HBox{MarginsZero: true},
+						StretchFactor: 2,
 						Children: []Widget{
 							MakeNumberEdit(999999999, 0, "", &configCache.ClientBandwidth, clientWindow),
 							ComboBox{
@@ -302,16 +342,83 @@ func ClientWindows() error {
 						},
 					},
 
-					HSpacer{},
-					HSpacer{},
+					Label{
+						Text:          "Repeat Count: ",
+						StretchFactor: 1,
+					},
+					MakeNumberEdit(9999999, 1, "", &configCache.ClientRepeatCount, clientWindow),
 
 					Label{
-						Text: "Report Output: ",
+						Text:          "Repeat Interval: ",
+						StretchFactor: 1,
+					},
+					MakeNumberEdit(9999999, 0, "Seconds", &configCache.ClientRepeatInterval, clientWindow),
+
+					Composite{
+						Layout:     Grid{Columns: 6, Spacing: 6},
+						ColumnSpan: 4,
+						Children: []Widget{
+							MakeClientCheckBox("No Delay", "Set TCP/SCTP no delay, disabling Nagle's Algorithm", &configCache.ClientNoDelay, clientWindow),
+							MakeClientCheckBox("Json Format", "Report in JSON format", &configCache.ClientJsonFormat, clientWindow),
+							MakeClientCheckBox("Zero Copy", "Use a 'zero copy' method of sending data", &configCache.ClientZeroCopy, clientWindow),
+							MakeClientCheckBox("Dont Fragment", "Set IPv4 Don't Fragment flag", &configCache.ClientDontFragment, clientWindow),
+
+							CheckBox{
+								AssignTo:      &clientReverseMode,
+								Text:          "Reverse Mode",
+								ToolTipText:   "Run in reverse mode, server sends, client receives",
+								Checked:       configCache.ClientReverseMode,
+								StretchFactor: 2,
+								OnCheckedChanged: func() {
+									configCache.ClientReverseMode = clientReverseMode.Checked()
+
+									if configCache.ClientReverseMode {
+										clientBidirectionalMode.SetChecked(false)
+									}
+
+									err := configSyncToFile()
+									if err != nil {
+										ErrorBoxAction(clientWindow, err.Error())
+									}
+								},
+								OnBoundsChanged: func() {
+									clientCheckBoxList = append(clientCheckBoxList, clientReverseMode)
+								},
+							},
+							CheckBox{
+								AssignTo:      &clientBidirectionalMode,
+								Text:          "Bidirectional Mode",
+								ToolTipText:   "Run in bidirectional mode, client and server send and receive",
+								Checked:       configCache.ClientBidirectionalMode,
+								StretchFactor: 2,
+								OnCheckedChanged: func() {
+									configCache.ClientBidirectionalMode = clientBidirectionalMode.Checked()
+
+									if configCache.ClientBidirectionalMode {
+										clientReverseMode.SetChecked(false)
+									}
+
+									err := configSyncToFile()
+									if err != nil {
+										ErrorBoxAction(clientWindow, err.Error())
+									}
+								},
+								OnBoundsChanged: func() {
+									clientCheckBoxList = append(clientCheckBoxList, clientBidirectionalMode)
+								},
+							},
+						},
+					},
+
+					Label{
+						Text:          "Report Output: ",
+						StretchFactor: 1,
 					},
 					LineEdit{
-						ColumnSpan: 2,
-						AssignTo:   &clientFolder,
-						Text:       configCache.ClientLog,
+						ColumnSpan:    2,
+						AssignTo:      &clientFolder,
+						Text:          configCache.ClientLog,
+						StretchFactor: 2,
 						OnEditingFinished: func() {
 							dir := clientFolder.Text()
 							if dir != "" {
@@ -334,11 +441,12 @@ func ClientWindows() error {
 						},
 					},
 					Composite{
-						Layout: HBox{MarginsZero: true},
+						Layout:        HBox{MarginsZero: true},
+						StretchFactor: 2,
 						Children: []Widget{
 							PushButton{
 								AssignTo: &clientFolderBut,
-								Text:     "...",
+								Text:     " ... ",
 								OnClicked: func() {
 									dlgDir := new(walk.FileDialog)
 									dlgDir.FilePath = configCache.ClientLog
@@ -363,7 +471,7 @@ func ClientWindows() error {
 								},
 							},
 							PushButton{
-								Text: "Open",
+								Text: " Open Folder ",
 								OnClicked: func() {
 									OpenBrowserWeb(configCache.ClientLog)
 								},

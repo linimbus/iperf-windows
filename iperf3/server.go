@@ -12,13 +12,13 @@ import (
 )
 
 var serverWindow *walk.MainWindow
-var serverInstance *IperfServer
+var serverInstance map[int]*IperfServer
 var serverMutex sync.Mutex
 var serverActive, serverFolderBut *walk.PushButton
 var serverStatusBar, serverFlowBar *walk.StatusBarItem
-var serverPort, serverInterval *walk.NumberEdit
+var serverPort, serverInterval, serverCount *walk.NumberEdit
 var serverFolder *walk.LineEdit
-
+var serverListen *walk.ComboBox
 var serverCheckBoxList []*walk.CheckBox
 
 func MakeCheckBox(name string, cfg *bool, form walk.Form) CheckBox {
@@ -59,15 +59,12 @@ func init() {
 			ServerSwitch()
 		}
 
-		for {
-			time.Sleep(time.Millisecond * 100)
-
-			serverMutex.Lock()
-			if serverInstance != nil && !serverInstance.running {
-				ServerStatus(ServerRunning())
-			}
-			serverMutex.Unlock()
-		}
+		// for {
+		// 	time.Sleep(time.Millisecond * 100)
+		// 	serverMutex.Lock()
+		// 	ServerStatus(ServerRunning())
+		// 	serverMutex.Unlock()
+		// }
 	}()
 }
 
@@ -82,13 +79,15 @@ func ServerRunning() bool {
 }
 
 func ServerStart() error {
-	var err error
-	serverInstance, err = ServerStartup()
-	if err != nil {
-		logs.Warning("iperf server startup failed, %s", err.Error())
-		return err
+	serverInstance = make(map[int]*IperfServer)
+	for i := 0; i < configCache.ServerCount; i++ {
+		server, err := ServerStartup(i)
+		if err != nil {
+			logs.Warning("iperf server startup failed, %s", err.Error())
+			return err
+		}
+		serverInstance[i] = server
 	}
-
 	return nil
 }
 
@@ -97,6 +96,8 @@ func ServerStatus(flag bool) {
 	serverInterval.SetEnabled(!flag)
 	serverFolderBut.SetEnabled(!flag)
 	serverFolder.SetEnabled(!flag)
+	serverListen.SetEnabled(!flag)
+	serverCount.SetEnabled(!flag)
 	for _, box := range serverCheckBoxList {
 		box.SetEnabled(!flag)
 	}
@@ -113,7 +114,12 @@ func ServerStatus(flag bool) {
 
 func ServerShutdown() error {
 	if serverInstance != nil {
-		serverInstance.Shutdown()
+		for i, server := range serverInstance {
+			if server != nil {
+				server.Shutdown()
+				logs.Info("iperf3.exe index: %d shutdown", i)
+			}
+		}
 		serverInstance = nil
 	}
 	return nil
@@ -152,6 +158,8 @@ func ServerClose() {
 
 func ServerWindows() error {
 	CapSignal(CloseWindows)
+
+	interfaces := InterfaceOptions()
 
 	cnt, err := MainWindow{
 		Title:    "IPerf3 Server " + VersionGet(),
@@ -232,6 +240,7 @@ func ServerWindows() error {
 							PushButton{
 								AssignTo: &serverFolderBut,
 								Text:     "...",
+								MaxSize:  Size{Width: 40},
 								OnClicked: func() {
 									dlgDir := new(walk.FileDialog)
 									dlgDir.FilePath = configCache.ServerLog
@@ -256,7 +265,8 @@ func ServerWindows() error {
 								},
 							},
 							PushButton{
-								Text: "Open",
+								Text:    "Open",
+								MaxSize: Size{Width: 40},
 								OnClicked: func() {
 									OpenBrowserWeb(configCache.ServerLog)
 								},
@@ -288,6 +298,23 @@ func ServerWindows() error {
 							},
 						},
 					},
+
+					Label{
+						Text: "Service Listen: ",
+					},
+					ComboBox{
+						AssignTo:     &serverListen,
+						CurrentIndex: InterfaceIndex(configCache.ServerListen, interfaces),
+						Model:        interfaces,
+						OnCurrentIndexChanged: func() {
+							configCache.ServerListen = serverListen.Text()
+							err := configSyncToFile()
+							if err != nil {
+								ErrorBoxAction(serverWindow, err.Error())
+							}
+						},
+					},
+
 					Label{
 						Text: "Service Port: ",
 					},
@@ -312,6 +339,33 @@ func ServerWindows() error {
 							},
 						},
 					},
+
+					Label{
+						Text:        "Service Count: ",
+						ToolTipText: "Support multiple iperf3 services startup, such as 5201, 5202, 5203....",
+					},
+					Composite{
+						Layout: HBox{MarginsZero: true},
+						Children: []Widget{
+							NumberEdit{
+								AssignTo: &serverCount,
+								Value:    float64(configCache.ServerCount),
+								MaxValue: 1000,
+								MinValue: 1,
+								OnValueChanged: func() {
+									configCache.ServerCount = int(serverCount.Value())
+									err := configSyncToFile()
+									if err != nil {
+										ErrorBoxAction(serverWindow, err.Error())
+									}
+								},
+							},
+							Label{
+								Text: " 1~1000",
+							},
+						},
+					},
+
 					Label{
 						Text: "Service Options: ",
 					},
