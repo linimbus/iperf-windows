@@ -15,7 +15,6 @@ var clientWindow *walk.MainWindow
 var clientStatusBar, clientFlowBar *walk.StatusBarItem
 var clientAddress *walk.LineEdit
 var clientProtocol, clientBandwidthUnit, clientListen *walk.ComboBox
-var clientProcessBar *walk.ProgressBar
 var clientNumberList []*walk.NumberEdit
 var clientCheckBoxList []*walk.CheckBox
 var clientActive *walk.PushButton
@@ -23,6 +22,9 @@ var clientFolder *walk.LineEdit
 var clientFolderBut *walk.PushButton
 var clientReverseMode *walk.CheckBox
 var clientBidirectionalMode *walk.CheckBox
+var clientInstance *IperfServer
+var clientShutdown bool
+var clientRunning bool
 
 func init() {
 	clientNumberList = make([]*walk.NumberEdit, 0)
@@ -104,40 +106,87 @@ func ClientEnable(flag bool) {
 		clientActive.SetText("Stop")
 	}
 
-	clientActive.SetEnabled(flag)
 	clientFolder.SetEnabled(flag)
 	clientFolderBut.SetEnabled(flag)
 }
 
-func ClientActive() {
+func ClientSwitch() {
+	clientActive.SetEnabled(false)
+	if clientRunning {
+		ClientShutdown()
+	} else {
+		go ClientActive(configCache)
+	}
+	time.Sleep(time.Millisecond * 200)
+	clientActive.SetEnabled(true)
+}
+
+func ClientShutdown() {
+	clientShutdown = true
+	if clientInstance != nil {
+		clientInstance.Shutdown()
+	}
+	for {
+		if !clientRunning {
+			break
+		}
+		time.Sleep(time.Millisecond * 200)
+	}
+}
+
+func ClientActive(config Config) {
+	var err error
+
+	defer ClientFlowUpdate("")
 	defer ClientEnable(true)
 
-	for i := 0; i < configCache.ClientRepeatCount; i++ {
-		client, err := ClientStartup(i)
+	logs.Info("client active startup")
+
+	repeatCount := config.ClientRepeatCount
+	repeatInterval := config.ClientRepeatInterval
+
+	ClientEnable(false)
+
+	clientRunning = true
+	for i := 0; i < repeatCount; i++ {
+		ClientFlowUpdate(fmt.Sprintf("Repeat Times: %d/%d", i+1, repeatCount))
+
+		if clientShutdown {
+			break
+		}
+
+		clientInstance, err = ClientStartup(i)
 		if err != nil {
 			ErrorBoxAction(clientWindow, err.Error())
-			return
+			break
 		}
-		clientProcessBar.SetValue(0)
 
-		for i := 0; ; i++ {
-			if !client.running {
+		for {
+			if !clientInstance.running {
 				break
 			}
-			time.Sleep(time.Second)
-
-			if i > configCache.ClientRunTime {
-				clientProcessBar.SetValue(100)
-			} else {
-				clientProcessBar.SetValue((i * 100) / (configCache.ClientRunTime))
-			}
+			time.Sleep(time.Millisecond * 200)
 		}
-		clientProcessBar.SetValue(100)
-		time.Sleep(time.Second * time.Duration(configCache.ClientRepeatInterval))
-	}
+		clientInstance = nil
 
-	time.Sleep(time.Millisecond * 100)
-	clientProcessBar.SetValue(0)
+		if i+1 == repeatCount || clientShutdown {
+			break
+		}
+
+		time.Sleep(time.Second * time.Duration(repeatInterval))
+	}
+	clientRunning = false
+	clientShutdown = false
+
+	logs.Info("client active stop")
+
+	time.Sleep(time.Millisecond * 200)
+}
+
+func ClientFlowUpdate(value string) {
+	if clientFlowBar != nil {
+		clientFlowBar.SetText(value)
+	}
 }
 
 func ClientStatusUpdate(value string) {
@@ -153,6 +202,10 @@ func ClientClose() {
 			logs.Warning("client close %s", err.Error())
 		}
 		clientWindow = nil
+	}
+	if clientInstance != nil {
+		clientInstance.Shutdown()
+		clientInstance = nil
 	}
 }
 
@@ -274,7 +327,7 @@ func ClientWindows() error {
 						ToolTipText:   "Set the time in seconds to transmit for (default 10 secs)",
 						StretchFactor: 1,
 					},
-					MakeNumberEdit(3600, 1, "Seconds", &configCache.ClientRunTime, clientWindow),
+					MakeNumberEdit(360000, 0, "Seconds", &configCache.ClientRunTime, clientWindow),
 
 					Label{
 						Text:          "Streams: ",
@@ -482,18 +535,6 @@ func ClientWindows() error {
 			},
 
 			Composite{
-				Layout: HBox{Margins: Margins{Top: 0, Bottom: 0, Left: 12, Right: 12}},
-				Children: []Widget{
-					ProgressBar{
-						AssignTo: &clientProcessBar,
-						MaxValue: 100,
-						MinValue: 0,
-						MinSize:  Size{Height: 2},
-						MaxSize:  Size{Height: 2},
-					},
-				},
-			},
-			Composite{
 				Layout: HBox{Margins: Margins{Top: 0, Bottom: 0, Left: 10, Right: 10}},
 				Children: []Widget{
 					PushButton{
@@ -501,9 +542,7 @@ func ClientWindows() error {
 						Image:    ICON_Start,
 						Text:     "Start",
 						OnClicked: func() {
-							ClientEnable(false)
-
-							go ClientActive()
+							ClientSwitch()
 						},
 					},
 				},

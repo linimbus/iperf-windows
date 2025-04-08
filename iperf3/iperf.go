@@ -141,31 +141,27 @@ func ExecuteAsync(binary string, cmd []string) (*os.File, *os.File, context.Canc
 		return nil, nil, nil, nil, err
 	}
 
-	exitCode := make(chan int)
+	exitCodeChan := make(chan int, 1)
 
 	go func() {
 		defer stdoutTmp.Close()
 		defer stderrTmp.Close()
 
-		if err := exe.Wait(); err != nil {
-			if exiterr, ok := err.(*exec.ExitError); ok {
-				if status, ok := exiterr.Sys().(syscall.WaitStatus); ok {
-					exitCode <- status.ExitStatus()
-				}
-			}
-		} else {
-			exitCode <- 0
-		}
+		exe.Wait()
+
+		logs.Info("iperf3.exe exit code %d", exe.ProcessState.ExitCode())
+
+		exitCodeChan <- exe.ProcessState.ExitCode()
 	}()
 
-	return stdoutTmp, stderrTmp, cancel, exitCode, nil
+	return stdoutTmp, stderrTmp, cancel, exitCodeChan, nil
 }
 
 func (s *IperfServer) Shutdown() {
 	if s.running && s.cancel != nil {
 		s.cancel()
 		time.Sleep(100 * time.Millisecond)
-		logs.Info("iperf3.exe shutdown")
+		logs.Info("shutdown iperf3.exe")
 	}
 }
 
@@ -224,7 +220,7 @@ func ServerStartup(index int) (*IperfServer, error) {
 
 	fmt.Fprintf(&builder, " --forceflush")
 
-	stdout, stdErr, cancel, exitCode, err := ExecuteAsync(filepath.Join(ToolDirGet(), "iperf3.exe"), strings.Fields(builder.String()))
+	stdout, stdErr, cancel, exitCodeChan, err := ExecuteAsync(filepath.Join(ToolDirGet(), "iperf3.exe"), strings.Fields(builder.String()))
 	if err != nil {
 		logs.Warning("iperf server startup failed, %s", err.Error())
 		return nil, err
@@ -237,7 +233,9 @@ func ServerStartup(index int) (*IperfServer, error) {
 	srv.running = true
 
 	go func() {
-		exitCode := <-exitCode
+		exitCode := <-exitCodeChan
+
+		logs.Info("iperf3.exe index: %d exit code %d", index, exitCode)
 
 		ReadResult(stdout.Name(), configCache.ServerLog)
 		ReadResult(stdErr.Name(), configCache.ServerLog)
@@ -305,9 +303,9 @@ func ClientStartup(cnt int) (*IperfServer, error) {
 
 	builder.WriteString(" --get-server-output")
 
-	stdout, stdErr, cancel, exitCode, err := ExecuteAsync(filepath.Join(ToolDirGet(), "iperf3.exe"), strings.Fields(builder.String()))
+	stdout, stdErr, cancel, exitCodeChan, err := ExecuteAsync(filepath.Join(ToolDirGet(), "iperf3.exe"), strings.Fields(builder.String()))
 	if err != nil {
-		logs.Warning("iperf server startup failed, %s", err.Error())
+		logs.Warning("iperf client startup failed, %s", err.Error())
 		return nil, err
 	}
 
@@ -318,10 +316,12 @@ func ClientStartup(cnt int) (*IperfServer, error) {
 	srv.running = true
 
 	go func() {
-		exitCode := <-exitCode
+		exitCode := <-exitCodeChan
 
 		ReadResult(stdout.Name(), configCache.ClientLog)
 		ReadResult(stdErr.Name(), configCache.ClientLog)
+
+		logs.Info("iperf3.exe client exit code %d", exitCode)
 
 		srv.exitCode = exitCode
 		srv.running = false
