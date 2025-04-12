@@ -273,6 +273,10 @@ func ClientStartup(cnt int) (*IperfServer, error) {
 		fmt.Fprintf(&builder, " -b %d%c", configCache.ClientBandwidth, configCache.ClientBandwidthUnit[0])
 	}
 
+	if configCache.ClientWindows > 0 {
+		fmt.Fprintf(&builder, " -w %d%c", configCache.ClientWindows, configCache.ClientWindowsUnit[0])
+	}
+
 	if configCache.ClientProtocol == "udp" {
 		builder.WriteString(" -u")
 	}
@@ -299,6 +303,30 @@ func ClientStartup(cnt int) (*IperfServer, error) {
 
 	if configCache.ClientJsonFormat {
 		builder.WriteString(" -J")
+	}
+
+	if configCache.ClientDscpValue > 0 {
+		fmt.Fprintf(&builder, " --dscp %d", configCache.ClientDscpValue)
+	}
+
+	if configCache.ClientTypeService > 0 {
+		fmt.Fprintf(&builder, " --tos %d", configCache.ClientTypeService)
+	}
+
+	if configCache.ClientDontFragment {
+		builder.WriteString(" --dont-fragment")
+	}
+
+	if configCache.ClientMaxmumSegment {
+		builder.WriteString(" --set-mss")
+	}
+
+	if configCache.ClientOnlyIPv4 {
+		builder.WriteString(" --version4")
+	}
+
+	if configCache.ClientOnlyIPv6 {
+		builder.WriteString(" --version6")
 	}
 
 	builder.WriteString(" --get-server-output")

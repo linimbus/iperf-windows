@@ -32,10 +32,16 @@ type Config struct {
 	ClientNoDelay           bool
 	ClientReverseMode       bool
 	ClientBidirectionalMode bool
+	ClientMaxmumSegment     bool
+	ClientOnlyIPv4          bool
+	ClientOnlyIPv6          bool
 	ClientStreams           int
 	ClientBandwidth         int
 	ClientBandwidthUnit     string // KB,MB,GB
-	ClientDscp              int
+	ClientWindows           int
+	ClientWindowsUnit       string
+	ClientDscpValue         int
+	ClientTypeService       int
 	ClientRepeatCount       int
 	ClientRepeatInterval    int
 	ClientLog               string
@@ -64,10 +70,16 @@ var configCache = Config{
 	ClientNoDelay:           false,
 	ClientReverseMode:       false,
 	ClientBidirectionalMode: false,
+	ClientMaxmumSegment:     false,
+	ClientOnlyIPv4:          false,
+	ClientOnlyIPv6:          false,
 	ClientStreams:           1,
 	ClientBandwidth:         0,
 	ClientBandwidthUnit:     "MB",
-	ClientDscp:              0,
+	ClientWindows:           0,
+	ClientWindowsUnit:       "MB",
+	ClientDscpValue:         0,
+	ClientTypeService:       0,
 	ClientRepeatCount:       1,
 	ClientRepeatInterval:    0,
 	ClientLog:               "",

@@ -14,7 +14,7 @@ import (
 )
 
 func VersionGet() string {
-	return "v0.3.3"
+	return "v0.3.4"
 }
 
 func SaveToFile(name string, body []byte) error {

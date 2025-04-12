@@ -14,9 +14,9 @@ import (
 var clientWindow *walk.MainWindow
 var clientStatusBar, clientFlowBar *walk.StatusBarItem
 var clientAddress *walk.LineEdit
-var clientProtocol, clientBandwidthUnit, clientListen *walk.ComboBox
+var clientProtocol, clientBandwidthUnit, clientWindowsUnit, clientListen *walk.ComboBox
 var clientNumberList []*walk.NumberEdit
-var clientCheckBoxList []*walk.CheckBox
+var clientCheckBoxMap map[string]*walk.CheckBox
 var clientActive *walk.PushButton
 var clientFolder *walk.LineEdit
 var clientFolderBut *walk.PushButton
@@ -28,7 +28,7 @@ var clientRunning bool
 
 func init() {
 	clientNumberList = make([]*walk.NumberEdit, 0)
-	clientCheckBoxList = make([]*walk.CheckBox, 0)
+	clientCheckBoxMap = make(map[string]*walk.CheckBox, 0)
 }
 
 func MakeClientCheckBox(name, tips string, cfg *bool, form walk.Form) CheckBox {
@@ -47,7 +47,29 @@ func MakeClientCheckBox(name, tips string, cfg *bool, form walk.Form) CheckBox {
 			}
 		},
 		OnBoundsChanged: func() {
-			clientCheckBoxList = append(clientCheckBoxList, box)
+			clientCheckBoxMap[name] = box
+		},
+	}
+}
+
+func MakeClientCheckBoxWithChecked(name, tips string, cfg *bool, form walk.Form, checked func(bool)) CheckBox {
+	var box *walk.CheckBox
+	return CheckBox{
+		AssignTo:      &box,
+		Text:          name,
+		ToolTipText:   tips,
+		Checked:       *cfg,
+		StretchFactor: 2,
+		OnCheckedChanged: func() {
+			*cfg = box.Checked()
+			checked(box.Checked())
+			err := configSyncToFile()
+			if err != nil {
+				ErrorBoxAction(form, err.Error())
+			}
+		},
+		OnBoundsChanged: func() {
+			clientCheckBoxMap[name] = box
 		},
 	}
 }
@@ -86,13 +108,14 @@ func ClientEnable(flag bool) {
 	clientAddress.SetEnabled(flag)
 	clientProtocol.SetEnabled(flag)
 	clientBandwidthUnit.SetEnabled(flag)
+	clientWindowsUnit.SetEnabled(flag)
 	clientListen.SetEnabled(flag)
 
 	for _, but := range clientNumberList {
 		but.SetEnabled(flag)
 	}
 
-	for _, but := range clientCheckBoxList {
+	for _, but := range clientCheckBoxMap {
 		but.SetEnabled(flag)
 	}
 
@@ -327,14 +350,14 @@ func ClientWindows() error {
 						ToolTipText:   "Set the time in seconds to transmit for (default 10 secs)",
 						StretchFactor: 1,
 					},
-					MakeNumberEdit(360000, 0, "Seconds", &configCache.ClientRunTime, clientWindow),
+					MakeNumberEdit(999999999, 0, "Seconds", &configCache.ClientRunTime, clientWindow),
 
 					Label{
 						Text:          "Streams: ",
 						ToolTipText:   "Set the number of parallel client streams to run",
 						StretchFactor: 1,
 					},
-					MakeNumberEdit(1024, 1, "", &configCache.ClientStreams, clientWindow),
+					MakeNumberEdit(65535, 1, "", &configCache.ClientStreams, clientWindow),
 
 					Label{
 						Text:          "Omit Time: ",
@@ -355,7 +378,7 @@ func ClientWindows() error {
 						ToolTipText:   "Set the IP dscp value, either 0-63 or symbolic. Numeric values can be specified in decimal,",
 						StretchFactor: 1,
 					},
-					MakeNumberEdit(63, 0, "", &configCache.ClientDscp, clientWindow),
+					MakeNumberEdit(63, 0, "", &configCache.ClientDscpValue, clientWindow),
 
 					Label{
 						Text:          "Bandwidth: ",
@@ -396,6 +419,51 @@ func ClientWindows() error {
 					},
 
 					Label{
+						Text:          "IP type of service: ",
+						ToolTipText:   "set the IP type of service, 0-255. The usual prefixes for octal and hex can be used, i.e. 52, 064 and 0x34 all specify the same value.",
+						StretchFactor: 1,
+					},
+					MakeNumberEdit(255, 0, "", &configCache.ClientTypeService, clientWindow),
+
+					Label{
+						Text:          "Windows: ",
+						ToolTipText:   "set send/receive socket buffer sizes (indirectly sets TCP window size)",
+						StretchFactor: 1,
+					},
+					Composite{
+						Layout:        HBox{MarginsZero: true},
+						StretchFactor: 2,
+						Children: []Widget{
+							MakeNumberEdit(999999999, 0, "", &configCache.ClientWindows, clientWindow),
+							ComboBox{
+								AssignTo: &clientWindowsUnit,
+								CurrentIndex: func() int {
+									switch configCache.ClientWindowsUnit {
+									case "KB":
+										return 0
+									case "MB":
+										return 1
+									case "GB":
+										return 2
+									default:
+										return 0
+									}
+								}(),
+								Model: []string{
+									"KB", "MB", "GB",
+								},
+								OnCurrentIndexChanged: func() {
+									configCache.ClientWindowsUnit = clientWindowsUnit.Text()
+									err := configSyncToFile()
+									if err != nil {
+										ErrorBoxAction(clientWindow, err.Error())
+									}
+								},
+							},
+						},
+					},
+
+					Label{
 						Text:          "Repeat Count: ",
 						StretchFactor: 1,
 					},
@@ -408,58 +476,60 @@ func ClientWindows() error {
 					MakeNumberEdit(9999999, 0, "Seconds", &configCache.ClientRepeatInterval, clientWindow),
 
 					Composite{
-						Layout:     Grid{Columns: 6, Spacing: 6},
+						Layout:     Grid{Columns: 5, Spacing: 6},
 						ColumnSpan: 4,
 						Children: []Widget{
 							MakeClientCheckBox("No Delay", "Set TCP/SCTP no delay, disabling Nagle's Algorithm", &configCache.ClientNoDelay, clientWindow),
 							MakeClientCheckBox("Json Format", "Report in JSON format", &configCache.ClientJsonFormat, clientWindow),
 							MakeClientCheckBox("Zero Copy", "Use a 'zero copy' method of sending data", &configCache.ClientZeroCopy, clientWindow),
 							MakeClientCheckBox("Dont Fragment", "Set IPv4 Don't Fragment flag", &configCache.ClientDontFragment, clientWindow),
+							MakeClientCheckBox("Maxmum Segment", "Set TCP/SCTP maximum segment size (MTU - 40 bytes)", &configCache.ClientMaxmumSegment, clientWindow),
 
-							CheckBox{
-								AssignTo:      &clientReverseMode,
-								Text:          "Reverse Mode",
-								ToolTipText:   "Run in reverse mode, server sends, client receives",
-								Checked:       configCache.ClientReverseMode,
-								StretchFactor: 2,
-								OnCheckedChanged: func() {
-									configCache.ClientReverseMode = clientReverseMode.Checked()
-
-									if configCache.ClientReverseMode {
-										clientBidirectionalMode.SetChecked(false)
+							MakeClientCheckBoxWithChecked("Reverse Mode", "Run in reverse mode, server sends, client receives",
+								&configCache.ClientReverseMode, clientWindow,
+								func(b bool) {
+									if b {
+										check, ok := clientCheckBoxMap["Bidirectional Mode"]
+										if ok {
+											check.SetChecked(false)
+										}
 									}
+								}),
 
-									err := configSyncToFile()
-									if err != nil {
-										ErrorBoxAction(clientWindow, err.Error())
+							MakeClientCheckBoxWithChecked("Bidirectional Mode", "Run in bidirectional mode, client and server send and receive",
+								&configCache.ClientBidirectionalMode, clientWindow,
+								func(b bool) {
+									if b {
+										check, ok := clientCheckBoxMap["Reverse Mode"]
+										if ok {
+											check.SetChecked(false)
+										}
 									}
-								},
-								OnBoundsChanged: func() {
-									clientCheckBoxList = append(clientCheckBoxList, clientReverseMode)
-								},
-							},
-							CheckBox{
-								AssignTo:      &clientBidirectionalMode,
-								Text:          "Bidirectional Mode",
-								ToolTipText:   "Run in bidirectional mode, client and server send and receive",
-								Checked:       configCache.ClientBidirectionalMode,
-								StretchFactor: 2,
-								OnCheckedChanged: func() {
-									configCache.ClientBidirectionalMode = clientBidirectionalMode.Checked()
+								}),
 
-									if configCache.ClientBidirectionalMode {
-										clientReverseMode.SetChecked(false)
-									}
+							HSpacer{},
 
-									err := configSyncToFile()
-									if err != nil {
-										ErrorBoxAction(clientWindow, err.Error())
+							MakeClientCheckBoxWithChecked("Only IPv4", "Only use IPv4",
+								&configCache.ClientOnlyIPv4, clientWindow,
+								func(b bool) {
+									if b {
+										check, ok := clientCheckBoxMap["Only IPv6"]
+										if ok {
+											check.SetChecked(false)
+										}
 									}
-								},
-								OnBoundsChanged: func() {
-									clientCheckBoxList = append(clientCheckBoxList, clientBidirectionalMode)
-								},
-							},
+								}),
+
+							MakeClientCheckBoxWithChecked("Only IPv6", "Only use IPv6",
+								&configCache.ClientOnlyIPv6, clientWindow,
+								func(b bool) {
+									if b {
+										check, ok := clientCheckBoxMap["Only IPv4"]
+										if ok {
+											check.SetChecked(false)
+										}
+									}
+								}),
 						},
 					},
 
